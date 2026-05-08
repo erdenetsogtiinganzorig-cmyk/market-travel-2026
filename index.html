@@ -454,6 +454,14 @@ async function loadSheet2() {
     const data = await fetchSheet2(APPS_SCRIPT_URL);
     SHEET2 = Array.isArray(data) ? data : (data.sheet2 || []);
 
+    // ⭐ Sheet2-аас sell2026 flag-г HIST-д sync хийнэ
+    // Google Sheets-д "Тийм"/"хоосон" өөрчлөхөд dashboard шинэчлэгдэнэ
+    if (SHEET2.length > 0) {
+      const sellSet = new Set(SHEET2.filter(p=>p.sell2026).map(p=>p.code));
+      HIST.forEach(h => { h.sell2026 = sellSet.has(h.code); });
+      console.log('✅ sell2026 sync:', sellSet.size, 'бараа 2026-д зарна');
+    }
+
     badge.className='live';
     text.textContent='Live — Sheet2 (' + new Date().toLocaleTimeString() + ')';
     LOADED=true;
@@ -1088,6 +1096,11 @@ function calcProfit() {
 // ══════════════════════════════════════
 let dropCat='all';
 function renderDrop(){
+  // Sheet2 ачаалагдсан бол HIST sell2026 дахин sync хийнэ
+  if (SHEET2.length > 0) {
+    const sellSet = new Set(SHEET2.filter(p=>p.sell2026).map(p=>p.code));
+    HIST.forEach(h => { h.sell2026 = sellSet.has(h.code); });
+  }
   const drop=HIST.filter(h=>!h.sell2026);
   const sold=drop.filter(h=>h.rev24>0||h.rev25>0);
   const never=drop.filter(h=>h.rev24===0&&h.rev25===0);
