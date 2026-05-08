@@ -163,6 +163,7 @@ input[type=range]{flex:1;accent-color:var(--acc)}
   <div class="fbar">
     <input class="srch" id="ord-srch" placeholder="🔍 Бараа хайх..." oninput="renderOrdTbl()">
     <div id="ord-cf" style="display:flex;gap:5px;flex-wrap:wrap"></div>
+    <div id="ord-source-f" style="display:flex;gap:5px;flex-wrap:wrap;border-left:1px solid var(--brd);padding-left:8px;margin-left:4px"></div>
   </div>
   <div class="card"><h3 id="ord-ttl">Захиалгын тооцоо (+30% зорилт)</h3>
     <div class="tbl-w" style="max-height:560px"><table id="ord-tbl"></table></div>
@@ -188,6 +189,56 @@ input[type=range]{flex:1;accent-color:var(--acc)}
   </div>
   <div class="fbar"><input class="srch" id="pr-srch" placeholder="🔍 Хайх..." oninput="renderPriceTbl()"></div>
   <div class="card"><div class="tbl-w" style="max-height:500px"><table id="pr-tbl"></table></div></div>
+
+  <!-- Ашиг тооцоолуур -->
+  <div class="card" style="margin-top:16px">
+    <h3 style="margin-bottom:16px">🧮 Ашигт ажиллагааны тооцоолуур — Шинэ өртөг/үнэ/тоогоор</h3>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:18px">
+      <div>
+        <label style="font-size:11px;color:var(--mut2);display:block;margin-bottom:4px">Бараа сонгох</label>
+        <select class="sel" id="calc-prod" onchange="calcProfit()" style="width:100%"></select>
+      </div>
+      <div>
+        <label style="font-size:11px;color:var(--mut2);display:block;margin-bottom:4px">Нэгж өртөг (₮)</label>
+        <input type="number" id="calc-cost" class="srch" style="width:100%" placeholder="0" oninput="calcProfit()">
+      </div>
+      <div>
+        <label style="font-size:11px;color:var(--mut2);display:block;margin-bottom:4px">Зарах үнэ (₮)</label>
+        <input type="number" id="calc-price" class="srch" style="width:100%" placeholder="0" oninput="calcProfit()">
+      </div>
+      <div>
+        <label style="font-size:11px;color:var(--mut2);display:block;margin-bottom:4px">Захиалах тоо (ш)</label>
+        <input type="number" id="calc-qty" class="srch" style="width:100%" placeholder="0" oninput="calcProfit()">
+      </div>
+    </div>
+    <!-- Зардлын таамаглал -->
+    <div style="background:var(--sur2);border-radius:10px;padding:14px;margin-bottom:16px">
+      <div style="font-size:11px;font-weight:600;color:var(--mut2);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px">Бусад зардлын таамаглал (2025-н дундаж дээр суурилсан)</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px">
+        <div>
+          <label style="font-size:11px;color:var(--mut2);display:block;margin-bottom:3px">Маркетинг/Ads (орлогын %)</label>
+          <div style="display:flex;align-items:center;gap:8px">
+            <input type="range" id="calc-ads-pct" min="0" max="30" value="6" step="1" oninput="document.getElementById('calc-ads-v').textContent=this.value+'%';calcProfit()">
+            <span id="calc-ads-v" style="font-size:12px;font-weight:600;color:var(--acc);min-width:32px">6%</span>
+          </div>
+        </div>
+        <div>
+          <label style="font-size:11px;color:var(--mut2);display:block;margin-bottom:3px">Хүргэлт (нэгжид ₮)</label>
+          <input type="number" id="calc-delivery" class="srch" style="width:100%" value="800" oninput="calcProfit()">
+        </div>
+        <div>
+          <label style="font-size:11px;color:var(--mut2);display:block;margin-bottom:3px">Оператор (нэгжид ₮)</label>
+          <input type="number" id="calc-operator" class="srch" style="width:100%" value="600" oninput="calcProfit()">
+        </div>
+        <div>
+          <label style="font-size:11px;color:var(--mut2);display:block;margin-bottom:3px">Тогтмол зардал (нэгжид ₮)</label>
+          <input type="number" id="calc-fixed" class="srch" style="width:100%" value="1200" oninput="calcProfit()">
+        </div>
+      </div>
+    </div>
+    <!-- Үр дүн -->
+    <div id="calc-result" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px"></div>
+  </div>
 </div>
 
 <!-- 2026-Д ЗАРАХГҮЙ -->
@@ -406,6 +457,7 @@ function calcFC(g) {
       code:p.code, name:p.name, cat1:p.cat1, cat2:p.cat2, is_new,
       qty25, rev25, pct25:h.pct25||0, ads25, price25:h.price25||0, cost25:h.cost25||0,
       order_qty:order26, qty26, rev26, prf26, pct26, price26, cost26, ads26,
+      from_drive: p.order_qty>0,  // Drive-аас орсон эсэх
       price_chg: h.price25>0?Math.round((price26-h.price25)/h.price25*1000)/10:0,
       cost_chg:  h.cost25>0 ?Math.round((cost26-h.cost25)/h.cost25*1000)/10:0,
       m7_pct: h.m7_pct||0,
@@ -548,14 +600,15 @@ function renderFcTbl(){
   let data=[...FC].filter(r=>(fcCat==='all'||r.cat1===fcCat)&&(!newOnly||r.is_new)&&((r.name||'').toLowerCase().includes(srch)));
   data.sort((a,b)=>b[srt]-a[srt]);
   document.getElementById('fc-tbl').innerHTML=`<thead><tr>
-    <th>#</th><th>Нэр</th><th>Ангилал</th>
+    <th>#</th><th>Код</th><th>Нэр</th><th>Ангилал</th>
     <th class="num">2025 борл(ш)</th><th class="num">2025 орлого</th><th class="num">2025 ашиг%</th>
     <th class="num">2026 захиалга(ш)</th><th class="num">2026 орлого</th><th class="num">2026 ашиг%</th>
     <th class="num">Өсөлт%</th><th class="num">2026 Ads</th>
   </tr></thead><tbody>`+
   data.map((r,i)=>`<tr>
     <td><span class="rk ${i<3?'r'+(i+1):'rn'}">${i+1}</span></td>
-    <td style="max-width:170px;overflow:hidden;text-overflow:ellipsis">${r.name}${r.is_new?'<span class="new-badge">NEW</span>':''}</td>
+    <td><code style="font-size:10px;color:var(--mut2)">${r.code||'—'}</code></td>
+    <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis">${r.name}${r.is_new?'<span class="new-badge">NEW</span>':''}</td>
     <td><span class="tag tg-b">${r.cat1||'—'}</span></td>
     <td class="num">${fN(r.qty25)}</td>
     <td class="num">${r.rev25>0?fmt(r.rev25):'—'}</td>
@@ -578,8 +631,23 @@ function renderOrd(){
   if(!cf.children.length){
     cf.innerHTML=`<button class="fb active" onclick="setOrdCat('all',this)">Бүгд</button>`+
       cats.map(c=>`<button class="fb" onclick="setOrdCat('${c}',this)">${c}</button>`).join('');
+    // Drive/Тооцоо шүүлтүүр
+    const sf = document.getElementById('ord-source-f');
+    if(sf && !sf.children.length) {
+      sf.innerHTML = `
+        <button class="fb active" onclick="setOrdSource('all',this)">📋+🔢 Бүгд</button>
+        <button class="fb" onclick="setOrdSource('drive',this)">📋 Drive</button>
+        <button class="fb" onclick="setOrdSource('calc',this)">🔢 Тооцоо</button>`;
+    }
   }
   updOrd(30);
+}
+let ordSource='all';
+function setOrdSource(s,btn){
+  ordSource=s;
+  document.querySelectorAll('#ord-source-f .fb').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderOrdTbl();
 }
 function setOrdCat(c,btn){ordCat=c;document.querySelectorAll('#ord-cf .fb').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderOrdTbl();}
 function updOrd(v){
@@ -594,23 +662,33 @@ function updOrd(v){
     <div class="kpi b"><div class="kpi-lbl">Нийт захиалга</div><div class="kpi-val">${fN(tot)}</div></div>
     <div class="kpi g"><div class="kpi-lbl">Тооцоолсон орлого</div><div class="kpi-val">${fmt(rev)}</div></div>
     <div class="kpi a"><div class="kpi-lbl">Тооцоолсон ашиг</div><div class="kpi-val">${fmt(prf)}</div><div class="kpi-sub">${rev>0?Math.round(prf/rev*100):0}%</div></div>
-    <div class="kpi p"><div class="kpi-lbl">Шинэ бараа</div><div class="kpi-val">${SHEET2.filter(p=>p.is_new).length}</div></div>`;
+    <div class="kpi p"><div class="kpi-lbl">Шинэ бараа</div><div class="kpi-val">${SHEET2.filter(p=>p.is_new).length}</div></div>
+    <div class="kpi g"><div class="kpi-lbl">📋 Drive-аас</div>
+      <div class="kpi-val">${fc.filter(r=>r.from_drive).length}</div>
+      <div class="kpi-sub">захиалга баталгаажсан</div></div>
+    <div class="kpi b"><div class="kpi-lbl">🔢 Тооцоолсон</div>
+      <div class="kpi-val">${fc.filter(r=>!r.from_drive).length}</div>
+      <div class="kpi-sub">санал болгосон</div></div>`;
   renderOrdTbl();
 }
 function renderOrdTbl(){
   const srch=(document.getElementById('ord-srch').value||'').toLowerCase();
   const fc=calcFC(ordG);
-  let data=fc.filter(r=>(ordCat==='all'||r.cat1===ordCat)&&((r.name||'').toLowerCase().includes(srch)));
+  let data=fc.filter(r=>
+    (ordCat==='all'||r.cat1===ordCat)&&
+    (ordSource==='all'||(ordSource==='drive'&&r.from_drive)||(ordSource==='calc'&&!r.from_drive))&&
+    ((r.name||'').toLowerCase().includes(srch)));
   data.sort((a,b)=>b.rev26-a.rev26);
   document.getElementById('ord-tbl').innerHTML=`<thead><tr>
-    <th>#</th><th>Нэр</th><th>Ангилал</th>
+    <th>#</th><th>Код</th><th>Нэр</th><th>Ангилал</th>
     <th class="num">2025 борл(ш)</th><th class="num">2026 захиалга(ш)</th>
     <th class="num">Шинэ өртөг</th><th class="num">Шинэ үнэ</th><th class="num">Margin%</th>
     <th class="num">Тооц.орлого</th><th class="num">Тооц.ашиг</th>
   </tr></thead><tbody>`+
   data.map((r,i)=>`<tr>
     <td><span class="rk rn">${i+1}</span></td>
-    <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis">${r.name}${r.is_new?'<span class="new-badge">NEW</span>':''}</td>
+    <td><code style="font-size:10px;color:var(--mut2)">${r.code||'—'}</code></td>
+    <td style="max-width:145px;overflow:hidden;text-overflow:ellipsis">${r.name}${r.is_new?'<span class="new-badge">NEW</span>':''}</td>
     <td><span class="tag tg-b">${r.cat1||'—'}</span></td>
     <td class="num">${fN(r.qty25)}</td>
     <td class="num" style="color:#60a5fa;font-weight:600">${fN(r.qty26)}</td>
@@ -648,6 +726,7 @@ function renderCat(){
        backgroundColor:cats.map(c=>c.rev26>0&&c.prf26/c.rev26>0.15?'#10b98188':'#f59e0b88'),borderRadius:4},
     ],{pct:true});
   },80);
+  setTimeout(initCat2Filters, 100);
   document.getElementById('cat-tbl').innerHTML=`<thead><tr>
     <th>#</th><th>Ангилал</th><th class="num">Нэр</th>
     <th class="num">2025 орлого</th><th class="num">Хувь%</th>
@@ -668,6 +747,111 @@ function renderCat(){
       <td class="num"><div class="pct-bar"><div class="pct-fill" style="width:${Math.min(p26,100)}%;background:#10b981"></div><span>${p26}%</span></div></td>
       <td class="num" style="color:${gr===null?'var(--mut)':gr>0?'#34d399':'#f87171'}">${gr===null?'—':gr>0?'+'+gr+'%':gr+'%'}</td>
       <td class="num" style="color:${c.rev26>0&&c.prf26/c.rev26>0.15?'#34d399':'#fbbf24'}">${c.rev26>0?Math.round(c.prf26/c.rev26*1000)/10:0}%</td>
+    </tr>`;
+  }).join('')+'</tbody>';
+}
+
+// ══════════════════════════════════════
+// ДЭД АНГИЛЛЫН ШИНЖИЛГЭЭ
+// ══════════════════════════════════════
+let selCat2Parent = null;
+
+function initCat2Filters() {
+  const cats = [...new Set(HIST.map(h=>h.cat1).filter(Boolean))].sort();
+  const wrap = document.getElementById('cat2-filter-wrap');
+  if (!wrap || wrap.children.length) return;
+  wrap.innerHTML = cats.map(c =>
+    `<button class="fb${c===cats[0]?' active':''}" onclick="renderCat2('${c.replace(/'/g,"\'+")}',this)">${c}</button>`
+  ).join('');
+  selCat2Parent = cats[0];
+  renderCat2(cats[0], wrap.children[0]);
+}
+
+function renderCat2(cat1, btn) {
+  selCat2Parent = cat1;
+  document.querySelectorAll('#cat2-filter-wrap .fb').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+
+  // Тухайн ангилалын дэд ангиллуудыг HIST-аас авна
+  const items = HIST.filter(h=>h.cat1===cat1 && h.sell2026);
+  const cat2Map = {};
+  items.forEach(h => {
+    const c2 = h.cat2 || 'Бусад';
+    if(!cat2Map[c2]) cat2Map[c2] = {rev24:0,rev25:0,prf24:0,prf25:0,qty24:0,qty25:0,cnt:0};
+    cat2Map[c2].rev24 += h.rev24||0;
+    cat2Map[c2].rev25 += h.rev25||0;
+    cat2Map[c2].prf24 += h.prf24||0;
+    cat2Map[c2].prf25 += h.prf25||0;
+    cat2Map[c2].qty24 += h.qty24||0;
+    cat2Map[c2].qty25 += h.qty25||0;
+    cat2Map[c2].cnt++;
+  });
+  const cats2 = Object.entries(cat2Map).sort((a,b)=>b[1].rev25-a[1].rev25);
+  const fc = calcFC(30);
+  const fc_cat = fc.filter(r=>r.cat1===cat1);
+
+  // FC-аас дэд ангиллын прогноз
+  const cat2Fc = {};
+  fc_cat.forEach(r => {
+    const c2 = (HIST.find(h=>h.code===r.code)||{}).cat2 || r.cat2 || 'Бусад';
+    if(!cat2Fc[c2]) cat2Fc[c2] = {rev26:0,prf26:0,qty26:0};
+    cat2Fc[c2].rev26 += r.rev26||0;
+    cat2Fc[c2].prf26 += r.prf26||0;
+    cat2Fc[c2].qty26 += r.qty26||0;
+  });
+
+  document.getElementById('cat2-rev-ttl').textContent = cat1 + ' — Дэд ангиллын орлого';
+  document.getElementById('cat2-prf-ttl').textContent = cat1 + ' — Дэд ангиллын ашиг%';
+
+  const labels = cats2.map(([n])=>n.length>10?n.slice(0,10)+'…':n);
+  const tRev25 = cats2.reduce((s,[,v])=>s+v.rev25,0)||1;
+  const pctLbls = cats2.map(([n,v])=>{
+    const p=Math.round(v.rev25/tRev25*100);
+    return (n.length>8?n.slice(0,8)+'…':n)+(p>0?' ('+p+'%)':'');
+  });
+
+  setTimeout(()=>{
+    bC('c-cat2-rev', pctLbls, [
+      {label:'2024',data:cats2.map(([,v])=>v.rev24),backgroundColor:'#3b82f688',borderRadius:4},
+      {label:'2025',data:cats2.map(([,v])=>v.rev25),backgroundColor:'#10b98188',borderRadius:4},
+      {label:'2026 прогноз',data:cats2.map(([n])=>(cat2Fc[n]||{}).rev26||0),backgroundColor:'#f59e0b88',borderRadius:4},
+    ]);
+    const prf25 = cats2.map(([,v])=>v.rev25>0?Math.round(v.prf25/v.rev25*1000)/10:0);
+    const prf26 = cats2.map(([n])=>{
+      const fc2=cat2Fc[n]||{};
+      return fc2.rev26>0?Math.round(fc2.prf26/fc2.rev26*1000)/10:0;
+    });
+    bC('c-cat2-prf', pctLbls, [
+      {label:'2025 ашиг%',data:prf25,backgroundColor:'#f59e0b88',borderRadius:4},
+      {label:'2026 прогноз',data:prf26,backgroundColor:'#10b98188',borderRadius:4},
+    ],{pct:true});
+  },80);
+
+  const totRev25=tRev25;
+  const totRev26=cats2.reduce((s,[n])=>s+(cat2Fc[n]||{}).rev26||0,0)||1;
+  document.getElementById('cat2-tbl').innerHTML=`<thead><tr>
+    <th>#</th><th>Дэд ангилал</th><th class="num">Нэр төрөл</th>
+    <th class="num">2024 орлого</th><th class="num">2025 орлого</th><th class="num">2025 хувь%</th>
+    <th class="num">2025 ашиг%</th><th class="num">2026 прогноз</th><th class="num">2026 хувь%</th>
+    <th class="num">Өсөлт%</th>
+  </tr></thead><tbody>`+
+  cats2.map(([n,v],i)=>{
+    const fc2=cat2Fc[n]||{rev26:0,prf26:0};
+    const p25=Math.round(v.rev25/totRev25*1000)/10;
+    const p26=Math.round(fc2.rev26/totRev26*1000)/10;
+    const gr=v.rev25>0?Math.round((fc2.rev26-v.rev25)/v.rev25*1000)/10:null;
+    const pct25=v.rev25>0?Math.round(v.prf25/v.rev25*1000)/10:0;
+    return `<tr>
+      <td><span class="rk ${i<3?'r'+(i+1):'rn'}">${i+1}</span></td>
+      <td><span class="tag tg-p" title="${n}">${n.length>16?n.slice(0,16)+'…':n}</span></td>
+      <td class="num">${v.cnt}</td>
+      <td class="num">${fmt(v.rev24)}</td>
+      <td class="num">${fmt(v.rev25)}</td>
+      <td class="num"><div class="pct-bar"><div class="pct-fill" style="width:${Math.min(p25,100)}%"></div><span>${p25}%</span></div></td>
+      <td class="num" style="color:${pct25>15?'#34d399':pct25>8?'#fbbf24':'#f87171'}">${pct25.toFixed(1)}%</td>
+      <td class="num" style="color:#34d399">${fmt(fc2.rev26)}</td>
+      <td class="num"><div class="pct-bar"><div class="pct-fill" style="width:${Math.min(p26,100)}%;background:#10b981"></div><span>${p26}%</span></div></td>
+      <td class="num" style="color:${gr===null?'var(--mut)':gr>0?'#34d399':'#f87171'}">${gr===null?'—':gr>0?'+'+gr+'%':gr+'%'}</td>
     </tr>`;
   }).join('')+'</tbody>';
 }
@@ -701,6 +885,17 @@ function renderPrice(){
     ],{pct:true});
   },80);
   renderPriceTbl();
+  // Тооцоолуурын бараа сонгох жагсаалт
+  setTimeout(()=>{
+    const sel = document.getElementById('calc-prod');
+    if(sel && !sel.options.length) {
+      const fc = calcFC(30);
+      sel.innerHTML = '<option value="">— Бараа сонгоно уу —</option>' +
+        fc.sort((a,b)=>b.rev26-a.rev26).map(r=>
+          `<option value="${r.code}" data-cost="${r.cost26}" data-price="${r.price26}" data-qty="${r.qty26}">[${r.code}] ${r.name.slice(0,35)}</option>`
+        ).join('');
+    }
+  },100);
 }
 function renderPriceTbl(){
   const srch=(document.getElementById('pr-srch').value||'').toLowerCase();
@@ -708,14 +903,15 @@ function renderPriceTbl(){
   let data=fc.filter(r=>r.price26>0&&(r.name||'').toLowerCase().includes(srch));
   data.sort((a,b)=>Math.abs(b.price_chg)-Math.abs(a.price_chg));
   document.getElementById('pr-tbl').innerHTML=`<thead><tr>
-    <th>#</th><th>Барааны нэр</th><th>Ангилал</th>
+    <th>#</th><th>Код</th><th>Барааны нэр</th><th>Ангилал</th>
     <th class="num">2025 өртөг</th><th class="num">2026 өртөг</th><th class="num">Өртгийн ∆%</th>
     <th class="num">2025 үнэ</th><th class="num">2026 үнэ</th><th class="num">Үнийн ∆%</th>
     <th class="num">2025 ашиг%</th><th class="num">2026 ашиг%</th>
   </tr></thead><tbody>`+
   data.map((r,i)=>`<tr>
     <td><span class="rk rn">${i+1}</span></td>
-    <td style="max-width:150px;overflow:hidden;text-overflow:ellipsis">${r.name}${r.is_new?'<span class="new-badge">NEW</span>':''}</td>
+    <td><code style="font-size:10px;color:var(--mut2)">${r.code||'—'}</code></td>
+    <td style="max-width:135px;overflow:hidden;text-overflow:ellipsis">${r.name}${r.is_new?'<span class="new-badge">NEW</span>':''}</td>
     <td><span class="tag tg-b">${r.cat1||'—'}</span></td>
     <td class="num">${r.cost25>0?fmt(r.cost25):'—'}</td>
     <td class="num">${r.cost26>0?fmt(r.cost26):'—'}</td>
@@ -726,6 +922,72 @@ function renderPriceTbl(){
     <td class="num" style="color:${r.pct25>15?'#34d399':r.pct25>8?'#fbbf24':'#f87171'}">${r.rev25>0?r.pct25.toFixed(1)+'%':'—'}</td>
     <td class="num" style="color:${r.pct26>15?'#34d399':r.pct26>8?'#fbbf24':'#f87171'}">${r.pct26.toFixed(1)}%</td>
   </tr>`).join('')+'</tbody>';
+}
+
+// ══════════════════════════════════════
+// АШИГ ТООЦООЛУУР
+// ══════════════════════════════════════
+function calcProfit() {
+  const sel   = document.getElementById('calc-prod');
+  const cost  = parseFloat(document.getElementById('calc-cost').value)  || 0;
+  const price = parseFloat(document.getElementById('calc-price').value) || 0;
+  const qty   = parseFloat(document.getElementById('calc-qty').value)   || 0;
+  const adsPct   = parseFloat(document.getElementById('calc-ads-pct').value) || 0;
+  const delivery = parseFloat(document.getElementById('calc-delivery').value) || 0;
+  const operator = parseFloat(document.getElementById('calc-operator').value) || 0;
+  const fixed    = parseFloat(document.getElementById('calc-fixed').value)    || 0;
+
+  // Бараа сонгосон бол автоматаар дүүргэнэ
+  if(sel && sel.value && (!cost || !price)) {
+    const opt = sel.selectedOptions[0];
+    if(opt) {
+      const autoCost  = parseFloat(opt.dataset.cost)  || 0;
+      const autoPrice = parseFloat(opt.dataset.price) || 0;
+      const autoQty   = parseFloat(opt.dataset.qty)   || 0;
+      if(!cost  && autoCost)  document.getElementById('calc-cost').value  = autoCost;
+      if(!price && autoPrice) document.getElementById('calc-price').value = autoPrice;
+      if(!qty   && autoQty)   document.getElementById('calc-qty').value   = autoQty;
+      calcProfit(); return;
+    }
+  }
+
+  if(!price || !qty) {
+    document.getElementById('calc-result').innerHTML =
+      '<div style="color:var(--mut);font-size:12px;padding:10px">Үнэ болон тоог оруулна уу</div>';
+    return;
+  }
+
+  const totalRev     = price * qty;
+  const totalCost    = cost * qty;
+  const adsAmt       = totalRev * adsPct / 100;
+  const deliveryAmt  = delivery * qty;
+  const operatorAmt  = operator * qty;
+  const fixedAmt     = fixed * qty;
+  const totalExpense = totalCost + adsAmt + deliveryAmt + operatorAmt + fixedAmt;
+  const grossProfit  = totalRev - totalCost;
+  const netProfit    = totalRev - totalExpense;
+  const grossMargin  = price>0?Math.round((price-cost)/price*1000)/10:0;
+  const netMargin    = totalRev>0?Math.round(netProfit/totalRev*1000)/10:0;
+  const unitNetPrf   = netProfit/qty;
+  const roas         = adsAmt>0?Math.round(totalRev/adsAmt*10)/10:0;
+
+  const card = (lbl,val,sub,color='var(--txt)') =>
+    `<div style="background:var(--sur2);border:1px solid var(--brd);border-radius:10px;padding:13px">
+      <div style="font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px">${lbl}</div>
+      <div style="font-size:19px;font-weight:700;color:${color}">${val}</div>
+      ${sub?`<div style="font-size:11px;color:var(--mut2);margin-top:3px">${sub}</div>`:''}
+    </div>`;
+
+  document.getElementById('calc-result').innerHTML =
+    card('Нийт орлого', fmt(totalRev), `${fN(qty)}ш × ${fmt(price)}`) +
+    card('Нийт өртөг', fmt(totalCost), `${fN(qty)}ш × ${fmt(cost)}`) +
+    card('Gross ашиг', fmt(grossProfit), `Gross margin: ${grossMargin}%`, grossProfit>0?'#34d399':'#f87171') +
+    card('Маркетинг/Ads', fmt(adsAmt), `Орлогын ${adsPct}% — ROAS: ${roas}x`) +
+    card('Хүргэлт+Оператор', fmt(deliveryAmt+operatorAmt), `${fN(qty)}ш × ${fmt(delivery+operator)}`) +
+    card('Тогтмол зардал', fmt(fixedAmt), `${fN(qty)}ш × ${fmt(fixed)}`) +
+    card('Нийт зардал', fmt(totalExpense), `Орлогын ${Math.round(totalExpense/totalRev*100)}%`) +
+    card('NET АШИГ', fmt(netProfit), `Net margin: ${netMargin}% | Нэгжид: ${fmt(unitNetPrf)}`,
+      netProfit>0?'#34d399':'#f87171');
 }
 
 // ══════════════════════════════════════
@@ -810,7 +1072,7 @@ function renderDropTbl(){
   data.sort((a,b)=>b[srt]-a[srt]);
   document.getElementById('drop-ttl').textContent=`2026-д зарахгүй бараанууд — ${data.length} бараа`;
   document.getElementById('drop-tbl').innerHTML=`<thead><tr>
-    <th>#</th><th>Барааны нэр</th><th>Ангилал1</th><th>Ангилал2</th>
+    <th>#</th><th>Код</th><th>Барааны нэр</th><th>Ангилал1</th><th>Ангилал2</th>
     <th class="num">2024 борл(ш)</th><th class="num">2024 орлого</th><th class="num">2024 ашиг%</th>
     <th class="num">2025 борл(ш)</th><th class="num">2025 орлого</th><th class="num">2025 ашиг%</th>
     <th class="num">Нийт орлого</th><th>Чиг</th><th>Статус</th>
@@ -822,7 +1084,8 @@ function renderDropTbl(){
       pct25<0?'<span class="tag tg-r">Алдагдалтай</span>':pct25<10?'<span class="tag tg-a">Margin бага</span>':'<span class="tag tg-g">Сайн margin</span>';
     return `<tr>
       <td><span class="rk rn">${i+1}</span></td>
-      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis">${h.name||''}</td>
+      <td><code style="font-size:10px;color:var(--mut2)">${h.code||'—'}</code></td>
+      <td style="max-width:145px;overflow:hidden;text-overflow:ellipsis">${h.name||''}</td>
       <td><span class="tag tg-b">${h.cat1||'—'}</span></td>
       <td><span class="tag tg-p">${h.cat2||'—'}</span></td>
       <td class="num">${fN(h.qty24||0)}</td>
