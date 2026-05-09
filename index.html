@@ -501,14 +501,14 @@ function calcFC(g) {
   const source = SHEET2.length > 0 ? SHEET2.filter(p=>p.sell2026) :
     HIST.filter(h=>h.sell2026).map(h=>({
       code:h.code, name:h.name, cat1:h.cat1||'', cat2:h.cat2||'',
-      sell2026:true, is_new:false,
+      sell2026:true, is_new:false,  // Статик горимд шинэ бараа байхгүй
       cost2026:h.cost25||0, price2026:h.price25||0,
       order_qty:0, margin2026:h.pct25||0,
     }));
   return source.map(p=>{
     const h = HIST.find(x=>x.code===p.code)||{};
     const qty25=h.qty25||0, rev25=h.rev25||0, ads25=h.ads25||0;
-    const is_new  = p.is_new && qty25===0;
+    const is_new  = p.is_new === true;  // Sheet2-ийн I баганаас
     const order26 = p.order_qty>0 ? p.order_qty : Math.round(qty25*gr);
     const qty26   = order26 || Math.round(qty25*gr);
     const price26 = p.price2026>0 ? p.price2026 : (h.price25||0);
@@ -538,7 +538,7 @@ function calcFC(g) {
       cost_chg:  h.cost25>0 ?Math.round((cost26-h.cost25)/h.cost25*1000)/10:0,
       m7_pct: h.m7_pct||0,
       rev_growth: rev25>0?Math.round((rev26-rev25)/rev25*1000)/10:(rev26>0?100:0),
-      from_drive: p.order_qty>0,
+      from_drive: p.has_order === true || p.order_qty > 0,  // Drive-аас ирсэн захиалга
     };
   });
 }
@@ -1024,6 +1024,21 @@ function renderPriceTbl(){
 // ══════════════════════════════════════
 // АШИГ ТООЦООЛУУР
 // ══════════════════════════════════════
+function onCalcProdChange() {
+  const sel = document.getElementById('calc-prod');
+  if (!sel || !sel.value) return;
+  const opt = sel.selectedOptions[0];
+  if (!opt) return;
+  // Бараа солигдох бүрт шинэ утгаар БҮРЭН дүүргэнэ
+  const autoCost  = parseFloat(opt.dataset.cost)  || 0;
+  const autoPrice = parseFloat(opt.dataset.price) || 0;
+  const autoQty   = parseFloat(opt.dataset.qty)   || 0;
+  if(autoCost)  document.getElementById('calc-cost').value  = autoCost;
+  if(autoPrice) document.getElementById('calc-price').value = autoPrice;
+  if(autoQty)   document.getElementById('calc-qty').value   = autoQty;
+  calcProfit();
+}
+
 function calcProfit() {
   const sel   = document.getElementById('calc-prod');
   const cost  = parseFloat(document.getElementById('calc-cost').value)  || 0;
@@ -1035,18 +1050,7 @@ function calcProfit() {
   const fixPct = parseFloat(document.getElementById('calc-fixed').value)||0;
   const taxPct = parseFloat(document.getElementById('calc-tax')?.value)||0;
 
-  // Бараа сонгосон бол автоматаар дүүргэнэ
-  if(sel && sel.value && (!cost || !price)) {
-    const opt = sel.selectedOptions[0];
-    if(opt) {
-      const autoCost  = parseFloat(opt.dataset.cost)  || 0;
-      const autoPrice = parseFloat(opt.dataset.price) || 0;
-      const autoQty   = parseFloat(opt.dataset.qty)   || 0;
-      if(!cost  && autoCost)  document.getElementById('calc-cost').value  = autoCost;
-      if(!price && autoPrice) document.getElementById('calc-price').value = autoPrice;
-      if(!qty   && autoQty)   document.getElementById('calc-qty').value   = autoQty;
-      calcProfit(); return;
-    }
+
   }
 
   if(!price || !qty) {
