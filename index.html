@@ -866,7 +866,8 @@ function renderOrdTbl(){
     <th>#</th><th>Код</th><th>Нэр</th><th>Ангилал</th>
     <th class="num">2025 борл(ш)</th><th class="num">2026 захиалга(ш)</th>
     <th class="num">Шинэ өртөг</th><th class="num">Шинэ үнэ</th><th class="num">Margin%</th>
-    <th class="num">Тооц.орлого</th><th class="num">Тооц.ашиг</th><th>Төлөв</th>
+    <th class="num">Тооц.орлого</th><th class="num">Тооц.ашиг</th>
+    <th class="num">Ads санал</th><th class="num">ROAS</th><th>Төлөв</th>
   </tr></thead><tbody>`+
   data.map((r,i)=>`<tr>
     <td><span class="rk rn">${i+1}</span></td>
@@ -880,6 +881,8 @@ function renderOrdTbl(){
     <td class="num" style="color:${r.pct26>15?'#34d399':r.pct26>8?'#fbbf24':'#f87171'}">${r.pct26.toFixed(1)}%</td>
     <td class="num" style="color:#34d399">${fmt(r.rev26)}</td>
     <td class="num" style="color:${r.prf26>0?'#34d399':'#f87171'}">${fmt(r.prf26)}</td>
+    <td class="num" style="color:#f59e0b">${r.ads26>0?fmt(r.ads26):'—'}</td>
+    <td class="num">${r.ads26>0?(r.rev26/r.ads26).toFixed(1)+'x':'—'}</td>
     <td>${
       r.ads_flag==='price_warn'  ? '<span class="tag tg-r">🔴 Үнэ нэм</span>' :
       r.ads_flag==='capped'      ? '<span class="tag tg-a">🟡 Ads cap</span>' :
