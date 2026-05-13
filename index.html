@@ -87,6 +87,27 @@ input[type=range]{flex:1;accent-color:var(--acc)}
 .ci-l{font-size:12px}
 .note{font-size:11px;color:var(--mut);border-top:1px solid var(--brd);margin-top:9px;padding-top:8px}
 @media(max-width:800px){.g2,.g3,.g64{grid-template-columns:1fr}.main{padding:12px 14px}.nav{padding:0 12px}.ci{grid-template-columns:1fr}}
+
+/* Барааны нэр custom tooltip */
+td[data-name] { position: relative; cursor: default; }
+td[data-name]:hover::after {
+  content: attr(data-name);
+  position: fixed;
+  background: #1e293b;
+  color: #f1f5f9;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  white-space: nowrap;
+  z-index: 9999;
+  border: 1px solid #334155;
+  box-shadow: 0 4px 12px rgba(0,0,0,.5);
+  pointer-events: none;
+  max-width: 400px;
+  white-space: normal;
+  line-height: 1.4;
+  margin-top: -30px;
+}
 </style>
 </head>
 <body>
@@ -425,6 +446,30 @@ function ST(n,btn) {
   if(!RENDERED[n]) { RENDERED[n]=true; RenderTab(n); }
 }
 window.ST = ST;
+
+// ── Барааны нэр hover tooltip ──
+(function() {
+  let tip = document.createElement('div');
+  tip.style.cssText = 'position:fixed;background:#1e293b;color:#f1f5f9;padding:6px 10px;border-radius:6px;font-size:12px;z-index:9999;border:1px solid #334155;box-shadow:0 4px 12px rgba(0,0,0,.5);pointer-events:none;display:none;max-width:320px;line-height:1.4;word-break:break-word';
+  document.body.appendChild(tip);
+  document.addEventListener('mouseover', e => {
+    const td = e.target.closest('td[data-name]');
+    if (td) {
+      tip.textContent = td.dataset.name;
+      tip.style.display = 'block';
+    }
+  });
+  document.addEventListener('mousemove', e => {
+    if (tip.style.display === 'block') {
+      const x = e.clientX + 12, y = e.clientY - 30;
+      tip.style.left = (x + tip.offsetWidth > window.innerWidth ? x - tip.offsetWidth - 20 : x) + 'px';
+      tip.style.top  = (y < 0 ? e.clientY + 15 : y) + 'px';
+    }
+  });
+  document.addEventListener('mouseout', e => {
+    if (!e.target.closest('td[data-name]')) tip.style.display = 'none';
+  });
+})();
 function RenderTab(n) {
   if(n==='ov')       renderOv();
   if(n==='forecast') renderFc();
@@ -792,7 +837,7 @@ function renderFcTbl(){
   data.map((r,i)=>`<tr>
     <td><span class="rk ${i<3?'r'+(i+1):'rn'}">${i+1}</span></td>
     <td><code style="font-size:10px;color:var(--mut2)">${r.code||'—'}</code></td>
-    <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;cursor:default" title="${r.name}">${r.name}${r.is_new?'<span class="new-badge">NEW</span>':''}</td>
+    <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;cursor:default" data-name="${r.name}">${r.name}${r.is_new?'<span class="new-badge">NEW</span>':''}</td>
     <td><span class="tag tg-b">${r.cat1||'—'}</span></td>
     <td class="num">${fN(r.qty25)}</td>
     <td class="num">${r.rev25>0?fmt(r.rev25):'—'}</td>
@@ -805,13 +850,15 @@ function renderFcTbl(){
   </tr>`).join('')+`</tbody>
   <tfoot><tr style="position:sticky;bottom:0;background:var(--sur2);border-top:2px solid var(--brd);font-weight:700">
     <td colspan="4" style="text-align:left;padding:6px 10px;color:var(--mut2);font-size:11px">Нийт ${data.length} бараа</td>
-    <td class="num">${fmt(data.reduce((s,r)=>s+(r.cost25||0),0))}</td>
-    <td class="num">${fmt(data.reduce((s,r)=>s+(r.price25||0),0))}</td>
+    <td class="num">${fN(data.reduce((s,r)=>s+r.qty25,0))}</td>
+    <td class="num">${fmt(data.reduce((s,r)=>s+r.rev25,0))}</td>
     <td class="num">—</td>
-    <td class="num">${fmt(data.reduce((s,r)=>s+(r.cost26||0),0))}</td>
-    <td class="num">${fmt(data.reduce((s,r)=>s+(r.price26||0),0))}</td>
+    <td class="num">${fN(data.reduce((s,r)=>s+r.qty26,0))}</td>
+    <td class="num">${fmt(data.reduce((s,r)=>s+r.rev26,0))}</td>
+    <td class="num">${(()=>{const tv=data.reduce((s,r)=>s+r.rev26,0),tp=data.reduce((s,r)=>s+r.prf26,0);return tv>0?Math.round(tp/tv*10)/10+'%':'—'})()}</td>
     <td class="num">—</td>
-    <td class="num">—</td>
+    <td class="num">${fmt(data.reduce((s,r)=>s+r.ads26,0))}</td>
+    <td>—</td>
   </tr></tfoot>`;
 }
 
@@ -883,7 +930,7 @@ function renderOrdTbl(){
   data.map((r,i)=>`<tr>
     <td><span class="rk rn">${i+1}</span></td>
     <td><code style="font-size:10px;color:var(--mut2)">${r.code||'—'}</code></td>
-    <td style="max-width:145px;overflow:hidden;text-overflow:ellipsis;cursor:default" title="${r.name}">${r.name}${r.is_new?'<span class="new-badge">NEW</span>':''}</td>
+    <td style="max-width:145px;overflow:hidden;text-overflow:ellipsis;cursor:default" data-name="${r.name}">${r.name}${r.is_new?'<span class="new-badge">NEW</span>':''}</td>
     <td><span class="tag tg-b">${r.cat1||'—'}</span></td>
     <td class="num">${fN(r.qty25)}</td>
     <td class="num" style="color:#60a5fa;font-weight:600">${fN(r.qty26)}</td>
@@ -901,7 +948,20 @@ function renderOrdTbl(){
       r.ads_flag==='low_volume'  ? '<span class="tag tg-b">📊 Ангилал avg</span>' :
       r.ads_flag==='organic'     ? '<span class="tag tg-g">🟢 Органик</span>' : ''
     }</td>
-  </tr>`).join('')+ '</tbody>';
+  </tr>`).join('')+`</tbody>
+  <tfoot><tr style="position:sticky;bottom:0;background:var(--sur2);border-top:2px solid var(--brd);font-weight:700">
+    <td colspan="4" style="text-align:left;padding:6px 10px;color:var(--mut2);font-size:11px">Нийт ${fc.length} бараа</td>
+    <td class="num">${fN(fc.reduce((s,r)=>s+r.qty25,0))}</td>
+    <td class="num">${fN(fc.reduce((s,r)=>s+r.qty26,0))}</td>
+    <td class="num">—</td>
+    <td class="num">—</td>
+    <td class="num">—</td>
+    <td class="num">${fmt(fc.reduce((s,r)=>s+r.rev26,0))}</td>
+    <td class="num" style="color:#34d399">${fmt(fc.reduce((s,r)=>s+r.prf26,0))}</td>
+    <td class="num" style="color:#f59e0b">${fmt(fc.reduce((s,r)=>s+r.ads26,0))}</td>
+    <td class="num">${fc.reduce((s,r)=>s+r.ads26,0)>0?(fc.reduce((s,r)=>s+r.rev26,0)/fc.reduce((s,r)=>s+r.ads26,0)).toFixed(1)+'x':'—'}</td>
+    <td>—</td>
+  </tr></tfoot>`;
 }
 
 // ══════════════════════════════════════
@@ -1115,7 +1175,7 @@ function renderPriceTbl(){
   data.map((r,i)=>`<tr>
     <td><span class="rk rn">${i+1}</span></td>
     <td><code style="font-size:10px;color:var(--mut2)">${r.code||'—'}</code></td>
-    <td style="max-width:135px;overflow:hidden;text-overflow:ellipsis;cursor:default" title="${r.name}">${r.name}${r.is_new?'<span class="new-badge">NEW</span>':''}</td>
+    <td style="max-width:135px;overflow:hidden;text-overflow:ellipsis;cursor:default" data-name="${r.name}">${r.name}${r.is_new?'<span class="new-badge">NEW</span>':''}</td>
     <td><span class="tag tg-b">${r.cat1||'—'}</span></td>
     <td class="num">${r.cost25>0?fmt(r.cost25):'—'}</td>
     <td class="num">${r.cost26>0?fmt(r.cost26):'—'}</td>
@@ -1600,7 +1660,7 @@ function renderHistTbl(){
     return `<tr>
       <td><span class="rk ${i<3?'r'+(i+1):'rn'}">${i+1}</span></td>
       <td><code style="font-size:10px;color:var(--mut2)">${r.code}</code></td>
-      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;cursor:default" title="${r.name}">${r.name||''}</td>
+      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;cursor:default" data-name="${r.name}">${r.name||''}</td>
       <td><span class="tag tg-b" style="font-size:10px">${r.cat1||'—'}</span></td>
       <td><span class="tag tg-p" style="font-size:10px">${r.cat2||'—'}</span></td>
       <td>${s26}</td>${yr_cell}
