@@ -792,7 +792,7 @@ function renderFcTbl(){
   data.map((r,i)=>`<tr>
     <td><span class="rk ${i<3?'r'+(i+1):'rn'}">${i+1}</span></td>
     <td><code style="font-size:10px;color:var(--mut2)">${r.code||'—'}</code></td>
-    <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis">${r.name}${r.is_new?'<span class="new-badge">NEW</span>':''}</td>
+    <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;cursor:default" title="${r.name}">${r.name}${r.is_new?'<span class="new-badge">NEW</span>':''}</td>
     <td><span class="tag tg-b">${r.cat1||'—'}</span></td>
     <td class="num">${fN(r.qty25)}</td>
     <td class="num">${r.rev25>0?fmt(r.rev25):'—'}</td>
@@ -802,7 +802,17 @@ function renderFcTbl(){
     <td class="num" style="color:${r.pct26>15?'#34d399':r.pct26>8?'#fbbf24':'#f87171'}">${r.pct26.toFixed(1)}%</td>
     <td class="num" style="color:${r.rev_growth>0?'#34d399':'#f87171'}">${r.rev_growth>0?'+':''}${r.rev_growth.toFixed(1)}%</td>
     <td class="num">${fmt(r.ads26)}</td>
-  </tr>`).join('')+'</tbody>';
+  </tr>`).join('')+`</tbody>
+  <tfoot><tr style="position:sticky;bottom:0;background:var(--sur2);border-top:2px solid var(--brd);font-weight:700">
+    <td colspan="4" style="text-align:left;padding:6px 10px;color:var(--mut2);font-size:11px">Нийт ${data.length} бараа</td>
+    <td class="num">${fmt(data.reduce((s,r)=>s+(r.cost25||0),0))}</td>
+    <td class="num">${fmt(data.reduce((s,r)=>s+(r.price25||0),0))}</td>
+    <td class="num">—</td>
+    <td class="num">${fmt(data.reduce((s,r)=>s+(r.cost26||0),0))}</td>
+    <td class="num">${fmt(data.reduce((s,r)=>s+(r.price26||0),0))}</td>
+    <td class="num">—</td>
+    <td class="num">—</td>
+  </tr></tfoot>`;
 }
 
 // ══════════════════════════════════════
@@ -873,7 +883,7 @@ function renderOrdTbl(){
   data.map((r,i)=>`<tr>
     <td><span class="rk rn">${i+1}</span></td>
     <td><code style="font-size:10px;color:var(--mut2)">${r.code||'—'}</code></td>
-    <td style="max-width:145px;overflow:hidden;text-overflow:ellipsis">${r.name}${r.is_new?'<span class="new-badge">NEW</span>':''}</td>
+    <td style="max-width:145px;overflow:hidden;text-overflow:ellipsis;cursor:default" title="${r.name}">${r.name}${r.is_new?'<span class="new-badge">NEW</span>':''}</td>
     <td><span class="tag tg-b">${r.cat1||'—'}</span></td>
     <td class="num">${fN(r.qty25)}</td>
     <td class="num" style="color:#60a5fa;font-weight:600">${fN(r.qty26)}</td>
@@ -1105,7 +1115,7 @@ function renderPriceTbl(){
   data.map((r,i)=>`<tr>
     <td><span class="rk rn">${i+1}</span></td>
     <td><code style="font-size:10px;color:var(--mut2)">${r.code||'—'}</code></td>
-    <td style="max-width:135px;overflow:hidden;text-overflow:ellipsis">${r.name}${r.is_new?'<span class="new-badge">NEW</span>':''}</td>
+    <td style="max-width:135px;overflow:hidden;text-overflow:ellipsis;cursor:default" title="${r.name}">${r.name}${r.is_new?'<span class="new-badge">NEW</span>':''}</td>
     <td><span class="tag tg-b">${r.cat1||'—'}</span></td>
     <td class="num">${r.cost25>0?fmt(r.cost25):'—'}</td>
     <td class="num">${r.cost26>0?fmt(r.cost26):'—'}</td>
@@ -1289,7 +1299,7 @@ function renderDropTbl(){
     return `<tr>
       <td><span class="rk rn">${i+1}</span></td>
       <td><code style="font-size:10px;color:var(--mut2)">${h.code||'—'}</code></td>
-      <td style="max-width:145px;overflow:hidden;text-overflow:ellipsis">${h.name||''}</td>
+      <td style="max-width:145px;overflow:hidden;text-overflow:ellipsis;cursor:default" title="${h.name||''}">${h.name||''}</td>
       <td><span class="tag tg-b">${h.cat1||'—'}</span></td>
       <td><span class="tag tg-p">${h.cat2||'—'}</span></td>
       <td class="num">${fN(h.qty24||0)}</td>
@@ -1301,7 +1311,23 @@ function renderDropTbl(){
       <td class="num">${h.rev_tot>0?fmt(h.rev_tot):'—'}</td>
       <td>${trnd}</td><td>${stat}</td>
     </tr>`;
-  }).join('')+'</tbody>';
+  }).join('')+`</tbody>
+  <tfoot><tr style="position:sticky;bottom:0;background:var(--sur2);border-top:2px solid var(--brd);font-weight:700">
+    <td colspan="4" style="text-align:left;padding:6px 10px;color:var(--mut2);font-size:11px">
+      Нийт ${data.length} бараа
+    </td>
+    <td class="num">${fN(data.reduce((s,r)=>s+r.qty25,0))}</td>
+    <td class="num">${fN(data.reduce((s,r)=>s+r.qty26,0))}</td>
+    <td class="num">—</td>
+    <td class="num">—</td>
+    <td class="num">—</td>
+    <td class="num">${fmt(data.reduce((s,r)=>s+r.rev26,0))}</td>
+    <td class="num">${fmt(data.reduce((s,r)=>s+r.prf26,0))}</td>
+    <td class="num">${fmt(data.reduce((s,r)=>s+r.ads26,0))}</td>
+    <td class="num">${data.reduce((s,r)=>s+(r.ads26>0?r.rev26/r.ads26:0),0)/data.filter(r=>r.ads26>0).length>0?
+      (data.reduce((s,r)=>s+(r.ads26>0?r.rev26:0),0)/data.reduce((s,r)=>s+r.ads26,0)).toFixed(1)+'x':'—'}</td>
+    <td>—</td>
+  </tr></tfoot>`;
 }
 
 // ══════════════════════════════════════
@@ -1574,7 +1600,7 @@ function renderHistTbl(){
     return `<tr>
       <td><span class="rk ${i<3?'r'+(i+1):'rn'}">${i+1}</span></td>
       <td><code style="font-size:10px;color:var(--mut2)">${r.code}</code></td>
-      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis" title="${r.name}">${r.name||''}</td>
+      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;cursor:default" title="${r.name}">${r.name||''}</td>
       <td><span class="tag tg-b" style="font-size:10px">${r.cat1||'—'}</span></td>
       <td><span class="tag tg-p" style="font-size:10px">${r.cat2||'—'}</span></td>
       <td>${s26}</td>${yr_cell}
@@ -1594,7 +1620,29 @@ function renderHistTbl(){
       <td class="num" style="color:${r.ret_pct>5?'#f87171':r.ret_pct>0?'#fbbf24':'var(--mut)'}">${r.ret_pct>0?r.ret_pct.toFixed(1)+'%':'—'}</td>
       <td class="num">${r.bonus>0?fmt(r.bonus):'—'}</td>
     </tr>`;
-  }).join('')+'</tbody>';
+  }).join('')+`</tbody>
+  <tfoot><tr style="position:sticky;bottom:0;background:var(--sur2);border-top:2px solid var(--brd);font-weight:700">
+    <td colspan="${isMo?7:6}" style="text-align:left;padding:6px 10px;color:var(--mut2);font-size:11px">
+      Нийт ${data.length} бараа
+    </td>
+    <td class="num">${fN(data.reduce((s,r)=>s+r.qty,0))}</td>
+    <td class="num">${fmt(data.reduce((s,r)=>s+r.rev,0))}</td>
+    <td class="num">—</td>
+    <td class="num">${fmt(data.reduce((s,r)=>s+r.profit,0))}</td>
+    <td class="num" style="color:${data.reduce((s,r)=>s+r.rev,0)>0?(Math.round(data.reduce((s,r)=>s+r.profit,0)/data.reduce((s,r)=>s+r.rev,0)*1000)/10)+'%':0+'%'}">
+      ${data.reduce((s,r)=>s+r.rev,0)>0?Math.round(data.reduce((s,r)=>s+r.profit,0)/data.reduce((s,r)=>s+r.rev,0)*1000)/10:0}%
+    </td>
+    <td class="num">${fmt(data.reduce((s,r)=>s+r.ads,0))}</td>
+    <td class="num">${data.reduce((s,r)=>s+r.ads,0)>0?(data.reduce((s,r)=>s+r.rev,0)/data.reduce((s,r)=>s+r.ads,0)).toFixed(1)+'x':'—'}</td>
+    <td class="num">${fmt(data.reduce((s,r)=>s+r.cost,0))}</td>
+    <td class="num">${fmt(data.reduce((s,r)=>s+r.delivery,0))}</td>
+    <td class="num">${fmt(data.reduce((s,r)=>s+r.operator,0))}</td>
+    <td class="num">${fmt(data.reduce((s,r)=>s+r.fixed,0))}</td>
+    <td class="num">${fmt(data.reduce((s,r)=>s+r.total_cost,0))}</td>
+    <td class="num">${fN(data.reduce((s,r)=>s+r.ret_qty,0))}</td>
+    <td class="num">—</td>
+    <td class="num">${fmt(data.reduce((s,r)=>s+r.bonus,0))}</td>
+  </tr></tfoot>`;
 }
 
 // ══════ INIT ══════
