@@ -669,22 +669,36 @@ function calcFC(g) {
 
 function getCats(fc) {
   const m={};
-  fc.forEach(r=>{
-    if(!m[r.cat1]) m[r.cat1]={rev25:0,prf25:0,cnt25:0, rev26:0,prf26:0,qty26:0,cnt:0};
-    const h=HIST.find(x=>x.code===r.code)||{};
-    m[r.cat1].rev25  += h.rev25||0;
-    m[r.cat1].prf25  += h.prf25||0;
-    m[r.cat1].cnt25  += (h.qty25||0)>0?1:0;
-    m[r.cat1].rev26  += r.rev26;
-    m[r.cat1].prf26  += r.prf26;
-    m[r.cat1].qty26  += r.qty26;
-    m[r.cat1].cnt++;
+
+  // 2025: HIST дахь БҮГД бараагаас ангиллаар нэгтгэнэ
+  HIST.forEach(h=>{
+    const c = h.cat1||'Бусад';
+    if(!m[c]) m[c]={rev25:0,prf25:0,cnt25:0, rev26:0,prf26:0,qty26:0,cnt:0};
+    if((h.qty25||0)>0){
+      m[c].rev25 += h.rev25||0;
+      m[c].prf25 += h.prf25||0;
+      m[c].cnt25++;
+    }
   });
-  return Object.entries(m).sort((a,b)=>b[1].rev26-a[1].rev26).map(([n,v])=>({
-    name:n, ...v,
-    pct25: v.rev25>0?Math.round(v.prf25/v.rev25*1000)/10:0,
-    pct26: v.rev26>0?Math.round(v.prf26/v.rev26*1000)/10:0,
-  }));
+
+  // 2026: FC (захиалсан бараанууд)-аас ангиллаар нэгтгэнэ
+  fc.forEach(r=>{
+    const c = r.cat1||'Бусад';
+    if(!m[c]) m[c]={rev25:0,prf25:0,cnt25:0, rev26:0,prf26:0,qty26:0,cnt:0};
+    m[c].rev26 += r.rev26;
+    m[c].prf26 += r.prf26;
+    m[c].qty26 += r.qty26;
+    m[c].cnt++;
+  });
+
+  return Object.entries(m)
+    .filter(([,v])=>v.rev25>0||v.rev26>0)
+    .sort((a,b)=>b[1].rev26-a[1].rev26)
+    .map(([n,v])=>({
+      name:n, ...v,
+      pct25: v.rev25>0?Math.round(v.prf25/v.rev25*1000)/10:0,
+      pct26: v.rev26>0?Math.round(v.prf26/v.rev26*1000)/10:0,
+    }));
 }
 
 // ══════════════════════════════════════
