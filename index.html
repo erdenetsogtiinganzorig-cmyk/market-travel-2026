@@ -670,15 +670,21 @@ function calcFC(g) {
 function getCats(fc) {
   const m={};
   fc.forEach(r=>{
-    if(!m[r.cat1]) m[r.cat1]={rev25:0,rev26:0,prf26:0,qty26:0,cnt:0};
+    if(!m[r.cat1]) m[r.cat1]={rev25:0,prf25:0,cnt25:0, rev26:0,prf26:0,qty26:0,cnt:0};
     const h=HIST.find(x=>x.code===r.code)||{};
-    m[r.cat1].rev25 += h.rev25||0;
-    m[r.cat1].rev26 += r.rev26;
-    m[r.cat1].prf26 += r.prf26;
-    m[r.cat1].qty26 += r.qty26;
+    m[r.cat1].rev25  += h.rev25||0;
+    m[r.cat1].prf25  += h.prf25||0;
+    m[r.cat1].cnt25  += (h.qty25||0)>0?1:0;
+    m[r.cat1].rev26  += r.rev26;
+    m[r.cat1].prf26  += r.prf26;
+    m[r.cat1].qty26  += r.qty26;
     m[r.cat1].cnt++;
   });
-  return Object.entries(m).sort((a,b)=>b[1].rev26-a[1].rev26).map(([n,v])=>({name:n,...v}));
+  return Object.entries(m).sort((a,b)=>b[1].rev26-a[1].rev26).map(([n,v])=>({
+    name:n, ...v,
+    pct25: v.rev25>0?Math.round(v.prf25/v.rev25*1000)/10:0,
+    pct26: v.rev26>0?Math.round(v.prf26/v.rev26*1000)/10:0,
+  }));
 }
 
 // ══════════════════════════════════════
@@ -992,25 +998,29 @@ function renderCat(){
   },80);
   setTimeout(initCat2Filters, 100);
   document.getElementById('cat-tbl').innerHTML=`<thead><tr>
-    <th>#</th><th>Ангилал</th><th class="num">Нэр</th>
-    <th class="num">2025 орлого</th><th class="num">Хувь%</th>
-    <th class="num">2026 прогноз</th><th class="num">Хувь%</th>
-    <th class="num">Өсөлт%</th><th class="num">2026 ашиг%</th>
+    <th>#</th><th>Ангилал</th>
+    <th class="num">2025 нэр</th><th class="num">2025 орлого</th><th class="num">2025 хувь%</th><th class="num">2025 ашиг%</th>
+    <th class="num">2026 нэр</th><th class="num">2026 орлого</th><th class="num">2026 хувь%</th><th class="num">2026 ашиг%</th>
+    <th class="num">Өсөлт%</th>
   </tr></thead><tbody>`+
   cats.map((c,i)=>{
-    const gr=c.rev25>0?Math.round((c.rev26-c.rev25)/c.rev25*1000)/10:null;
-    const p25=Math.round(c.rev25/tRev25*1000)/10;
-    const p26=Math.round(c.rev26/tRev26*1000)/10;
+    const gr  = c.rev25>0?Math.round((c.rev26-c.rev25)/c.rev25*1000)/10:null;
+    const p25 = Math.round(c.rev25/tRev25*1000)/10;
+    const p26 = Math.round(c.rev26/tRev26*1000)/10;
+    const col25 = c.pct25>15?'#34d399':c.pct25>8?'#fbbf24':'#f87171';
+    const col26 = c.pct26>15?'#34d399':c.pct26>8?'#fbbf24':'#f87171';
     return `<tr>
       <td><span class="rk ${i<3?'r'+(i+1):'rn'}">${i+1}</span></td>
-      <td><span class="tag tg-b" title="${c.name}">${c.name.length>14?c.name.slice(0,14)+'…':c.name}</span></td>
-      <td class="num">${c.cnt}</td>
+      <td><span class="tag tg-b" title="${c.name}">${c.name.length>16?c.name.slice(0,16)+'…':c.name}</span></td>
+      <td class="num">${c.cnt25||c.cnt}</td>
       <td class="num">${fmt(c.rev25)}</td>
       <td class="num"><div class="pct-bar"><div class="pct-fill" style="width:${Math.min(p25,100)}%"></div><span>${p25}%</span></div></td>
+      <td class="num" style="color:${col25}">${c.pct25.toFixed(1)}%</td>
+      <td class="num">${c.cnt}</td>
       <td class="num" style="color:#34d399">${fmt(c.rev26)}</td>
       <td class="num"><div class="pct-bar"><div class="pct-fill" style="width:${Math.min(p26,100)}%;background:#10b981"></div><span>${p26}%</span></div></td>
+      <td class="num" style="color:${col26}">${c.pct26.toFixed(1)}%</td>
       <td class="num" style="color:${gr===null?'var(--mut)':gr>0?'#34d399':'#f87171'}">${gr===null?'—':gr>0?'+'+gr+'%':gr+'%'}</td>
-      <td class="num" style="color:${c.rev26>0&&c.prf26/c.rev26>0.15?'#34d399':'#fbbf24'}">${c.rev26>0?Math.round(c.prf26/c.rev26*1000)/10:0}%</td>
     </tr>`;
   }).join('')+'</tbody>';
 }
