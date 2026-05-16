@@ -135,6 +135,7 @@ td[data-name]:hover::after {
   <button class="nb" onclick="ST('drop',this)">🚫 2026-д зарахгүй</button>
   <button class="nb" onclick="ST('mkt',this)">📣 Маркетинг</button>
   <button class="nb" onclick="ST('hist',this)">📊 Өнгөрсөн анализ</button>
+  <button class="nb" onclick="ST('plan',this)">🗓️ Sales Plan 2026</button>
 </nav>
 
 <div class="main">
@@ -478,6 +479,7 @@ function RenderTab(n) {
   if(n==='price')    renderPrice();
   if(n==='drop')     renderDrop();
   if(n==='hist')     { if(window.__HIST__) renderHist(); else setTimeout(renderHist,200); }
+  if(n==='plan')     renderPlan();
   if(n==='mkt')      renderMkt();
 }
 
@@ -699,6 +701,155 @@ function getCats(fc) {
       pct25: v.rev25>0?Math.round(v.prf25/v.rev25*1000)/10:0,
       pct26: v.rev26>0?Math.round(v.prf26/v.rev26*1000)/10:0,
     }));
+}
+
+
+// ══════════════════════════════════════
+// SALES PLAN 2026
+// ══════════════════════════════════════
+let planCat = 'all';
+
+function renderPlan() {
+  const data = window.__PLAN__ || [];
+  if (!data.length) {
+    document.getElementById('kp-plan').innerHTML =
+      '<div style="color:var(--mut);padding:20px">Өгөгдөл байхгүй</div>';
+    return;
+  }
+
+  const MONTHS = [5,6,7,8];
+  const MN = {5:'5-р сар',6:'6-р сар',7:'7-р сар',8:'8-р сар'};
+
+  // KPI
+  const totOq  = data.reduce((s,r)=>s+r.order_qty,0);
+  const totRev = data.reduce((s,r)=>s+r.total_rev,0);
+  const totCost= data.reduce((s,r)=>s+r.total_cost,0);
+  const revByM = MONTHS.map(m=>data.reduce((s,r)=>s+(r['rev'+m]||0),0));
+  const peakM  = MONTHS[revByM.indexOf(Math.max(...revByM))];
+
+  document.getElementById('kp-plan').innerHTML = `
+    <div class="kpi b"><div class="kpi-lbl">Нийт захиалга</div>
+      <div class="kpi-val">${fN(totOq)}</div><div class="kpi-sub">ширхэг (5–8 сар)</div></div>
+    <div class="kpi g"><div class="kpi-lbl">Нийт орлогын прогноз</div>
+      <div class="kpi-val">${fmt(totRev)}</div><div class="kpi-sub">5–8 сарын нийт</div></div>
+    <div class="kpi a"><div class="kpi-lbl">Нийт өртгийн нийлбэр</div>
+      <div class="kpi-val">${fmt(totCost)}</div><div class="kpi-sub">худалдан авалтын дүн</div></div>
+    <div class="kpi p"><div class="kpi-lbl">Оргил сар</div>
+      <div class="kpi-val">${MN[peakM]}</div>
+      <div class="kpi-sub">${fmt(revByM[MONTHS.indexOf(peakM)])} орлого</div></div>
+    <div class="kpi b"><div class="kpi-lbl">Нийт бараа</div>
+      <div class="kpi-val">${data.length}</div><div class="kpi-sub">нэр төрөл</div></div>
+  `;
+
+  // Charts
+  setTimeout(()=>{
+    const qByM = MONTHS.map(m=>data.reduce((s,r)=>s+(r['qty'+m]||0),0));
+    const rByM = MONTHS.map(m=>data.reduce((s,r)=>s+(r['rev'+m]||0),0));
+    const labs = MONTHS.map(m=>MN[m]);
+    bC('c-plan-qty', labs, [
+      {label:'Борлуулалт (ш)', data:qByM,
+       backgroundColor:['#3b82f655','#10b98155','#f59e0b99','#ef444455'],
+       borderColor:['#3b82f6','#10b981','#f59e0b','#ef4444'],
+       borderWidth:2, borderRadius:6}
+    ]);
+    bC('c-plan-rev', labs, [
+      {label:'Орлого (₮)', data:rByM,
+       backgroundColor:['#3b82f655','#10b98155','#f59e0b99','#ef444455'],
+       borderColor:['#3b82f6','#10b981','#f59e0b','#ef4444'],
+       borderWidth:2, borderRadius:6}
+    ]);
+  }, 80);
+
+  // Cat filter
+  const allCats = [...new Set(data.map(r=>r.cat1))].sort();
+  const cf = document.getElementById('plan-cat-f');
+  if (!cf.children.length) {
+    cf.innerHTML = '<button class="fb active" onclick="setPlanCat('all',this)">Бүгд</button>' +
+      allCats.map(c=>`<button class="fb" onclick="setPlanCat('${c.replace(/'/g,"\'")}',this)">${c}</button>`).join('');
+  }
+
+  renderPlanTbl();
+}
+
+function setPlanCat(c, btn) {
+  planCat = c;
+  document.querySelectorAll('#plan-cat-f .fb').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  renderPlanTbl();
+}
+
+function renderPlanTbl() {
+  const data = (window.__PLAN__||[]).filter(r=>
+    (planCat==='all'||r.cat1===planCat) &&
+    ((r.name||'').toLowerCase().includes((document.getElementById('plan-srch').value||'').toLowerCase()))
+  );
+  const view = document.getElementById('plan-view').value;
+  const MONTHS = [5,6,7,8];
+  const MN = {5:'5-р сар',6:'6-р сар',7:'7-р сар',8:'8-р сар'};
+  const isRev  = view==='rev';
+  const isCost = view==='cost';
+
+  const vKey = m => isRev?'rev'+m:isCost?'cost_m'+m:'qty'+m;
+
+  // cost per month = qty × unit_cost
+  data.forEach(r=>{
+    MONTHS.forEach(m=>{
+      r['cost_m'+m] = Math.round((r['qty'+m]||0) * (r.cost||0));
+    });
+  });
+
+  // Ангиллаар эрэмбэлнэ
+  const sorted = [...data].sort((a,b)=>{
+    if(a.cat1!==b.cat1) return a.cat1.localeCompare(b.cat1);
+    return b.total_rev - a.total_rev;
+  });
+
+  const FS = 'style="position:sticky;bottom:0;background:var(--sur2);border-top:2px solid var(--brd);font-weight:700"';
+
+  document.getElementById('plan-tbl').innerHTML = `<thead><tr>
+    <th>#</th><th>Код</th><th>Барааны нэр</th><th>Ангилал</th>
+    <th class="num">Нийт захиалга</th>
+    <th class="num" style="color:#3b82f6">5-р сар</th>
+    <th class="num" style="color:#10b981">6-р сар</th>
+    <th class="num" style="color:#f59e0b">7-р сар</th>
+    <th class="num" style="color:#ef4444">8-р сар</th>
+    <th class="num">Нийт ${isRev?'орлого':isCost?'өртөг':'борлуулалт'}</th>
+    <th class="num">Үнэ</th><th class="num">Өртөг</th><th>Төрөл</th>
+  </tr></thead><tbody>` +
+  sorted.map((r,i) => {
+    const v = m => {
+      const val = isRev?(r['rev'+m]||0):isCost?r['cost_m'+m]:(r['qty'+m]||0);
+      return isRev||isCost?fmt(val):fN(val);
+    };
+    const tot = isRev?fmt(r.total_rev):isCost?fmt(MONTHS.reduce((s,m)=>s+r['cost_m'+m],0)):fN(r.order_qty);
+    const typ = r.is_new?'<span class="tag tg-p">🆕 Шинэ</span>':
+                r.has_stock?'<span class="tag tg-g">📦 Үлдэгдэлтэй</span>':
+                '<span class="tag tg-b">🔄 Шинэ захиалга</span>';
+    return `<tr>
+      <td><span class="rk rn">${i+1}</span></td>
+      <td><code style="font-size:10px;color:var(--mut2)">${r.code}</code></td>
+      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;cursor:default" data-name="${r.name}">${r.name}</td>
+      <td><span class="tag tg-b" style="font-size:10px">${r.cat1}</span></td>
+      <td class="num" style="font-weight:600">${fN(r.order_qty)}</td>
+      <td class="num" style="color:#3b82f6">${v(5)}</td>
+      <td class="num" style="color:#10b981">${v(6)}</td>
+      <td class="num" style="color:#f59e0b;font-weight:600">${v(7)}</td>
+      <td class="num" style="color:#ef4444">${v(8)}</td>
+      <td class="num">${tot}</td>
+      <td class="num">${r.price>0?fmt(r.price):'—'}</td>
+      <td class="num">${r.cost>0?fmt(r.cost):'—'}</td>
+      <td>${typ}</td>
+    </tr>`;
+  }).join('') + `</tbody>
+  <tfoot><tr ${FS}>
+    <td colspan="4" style="text-align:left;padding:6px 10px;color:var(--mut2);font-size:11px">
+      Нийт ${sorted.length} бараа
+    </td>
+    <td class="num">${fN(sorted.reduce((s,r)=>s+r.order_qty,0))}</td>
+    ${[5,6,7,8].map(m=>`<td class="num">${isRev?fmt(sorted.reduce((s,r)=>s+(r['rev'+m]||0),0)):isCost?fmt(sorted.reduce((s,r)=>s+r['cost_m'+m],0)):fN(sorted.reduce((s,r)=>s+(r['qty'+m]||0),0))}</td>`).join('')}
+    <td class="num">${isRev?fmt(sorted.reduce((s,r)=>s+r.total_rev,0)):isCost?fmt(sorted.reduce((s,r)=>s+[5,6,7,8].reduce((ss,m)=>ss+r['cost_m'+m],0),0)):fN(sorted.reduce((s,r)=>s+r.order_qty,0))}</td>
+    <td colspan="3"></td>
+  </tr></tfoot>`;
 }
 
 // ══════════════════════════════════════
