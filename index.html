@@ -135,6 +135,8 @@ td[data-name]:hover::after {
   <button class="nb" onclick="ST('drop',this)">🚫 2026-д зарахгүй</button>
   <button class="nb" onclick="ST('mkt',this)">📣 Маркетинг</button>
   <button class="nb" onclick="ST('hist',this)">📊 Өнгөрсөн анализ</button>
+  <button class="nb" onclick="ST('plan',this)">🗓️ Sales Plan 2026</button>
+  <button class="nb" onclick="ST('actual',this)">📊 2026 Гүйцэтгэл</button>
 </nav>
 
 <div class="main">
@@ -380,6 +382,9 @@ let SHEET2      = [];
 let FC          = [];
 let LOADED      = false;
 let CAT_ADS_PCT = {};  // Ангиллын ads% — Apps Script-аас
+let ACTUAL2026   = null;  // 2026 бодит дата — Apps Script-аас
+let PLAN_DATA    = window.__PLAN_DATA__ || {};  // 2026 прогноз
+let actualFilter = { from: null, to: null };  // Огноо шүүлтүүр
 
 // ══════ Helpers ══════
 const fmt = n => {
@@ -478,6 +483,11 @@ function RenderTab(n) {
   if(n==='price')    renderPrice();
   if(n==='drop')     renderDrop();
   if(n==='hist')     { if(window.__HIST__) renderHist(); else setTimeout(renderHist,200); }
+  if(n==='plan')     renderPlan();
+  if(n==='actual') {
+    if(!ACTUAL2026) loadActual2026();
+    else renderActual();
+  }
   if(n==='mkt')      renderMkt();
 }
 
@@ -699,6 +709,514 @@ function getCats(fc) {
       pct25: v.rev25>0?Math.round(v.prf25/v.rev25*1000)/10:0,
       pct26: v.rev26>0?Math.round(v.prf26/v.rev26*1000)/10:0,
     }));
+}
+
+
+// ══════════════════════════════════════
+// SALES PLAN 2026
+// ══════════════════════════════════════
+let planCat = 'all';
+
+function renderPlan() {
+  const data = window.__PLAN__ || [];
+  if (!data.length) {
+    document.getElementById('kp-plan').innerHTML =
+      '<div style="color:var(--mut);padding:20px">Өгөгдөл байхгүй</div>';
+    return;
+  }
+
+  const MONTHS = [5,6,7,8];
+  const MN = {5:'5-р сар',6:'6-р сар',7:'7-р сар',8:'8-р сар'};
+
+  // KPI
+  const totOq  = data.reduce((s,r)=>s+r.order_qty,0);
+  const totRev = data.reduce((s,r)=>s+r.total_rev,0);
+  const totCost= data.reduce((s,r)=>s+r.total_cost,0);
+  const revByM = MONTHS.map(m=>data.reduce((s,r)=>s+(r['rev'+m]||0),0));
+  const peakM  = MONTHS[revByM.indexOf(Math.max(...revByM))];
+
+  document.getElementById('kp-plan').innerHTML = `
+    <div class="kpi b"><div class="kpi-lbl">Нийт захиалга</div>
+      <div class="kpi-val">${fN(totOq)}</div><div class="kpi-sub">ширхэг (5–8 сар)</div></div>
+    <div class="kpi g"><div class="kpi-lbl">Нийт орлогын прогноз</div>
+      <div class="kpi-val">${fmt(totRev)}</div><div class="kpi-sub">5–8 сарын нийт</div></div>
+    <div class="kpi a"><div class="kpi-lbl">Нийт өртгийн нийлбэр</div>
+      <div class="kpi-val">${fmt(totCost)}</div><div class="kpi-sub">худалдан авалтын дүн</div></div>
+    <div class="kpi p"><div class="kpi-lbl">Оргил сар</div>
+      <div class="kpi-val">${MN[peakM]}</div>
+      <div class="kpi-sub">${fmt(revByM[MONTHS.indexOf(peakM)])} орлого</div></div>
+    <div class="kpi b"><div class="kpi-lbl">Нийт бараа</div>
+      <div class="kpi-val">${data.length}</div><div class="kpi-sub">нэр төрөл</div></div>
+  `;
+
+  // Charts
+  setTimeout(()=>{
+    const qByM = MONTHS.map(m=>data.reduce((s,r)=>s+(r['qty'+m]||0),0));
+    const rByM = MONTHS.map(m=>data.reduce((s,r)=>s+(r['rev'+m]||0),0));
+    const labs = MONTHS.map(m=>MN[m]);
+    bC('c-plan-qty', labs, [
+      {label:'Борлуулалт (ш)', data:qByM,
+       backgroundColor:['#3b82f655','#10b98155','#f59e0b99','#ef444455'],
+       borderColor:['#3b82f6','#10b981','#f59e0b','#ef4444'],
+       borderWidth:2, borderRadius:6}
+    ]);
+    bC('c-plan-rev', labs, [
+      {label:'Орлого (₮)', data:rByM,
+       backgroundColor:['#3b82f655','#10b98155','#f59e0b99','#ef444455'],
+       borderColor:['#3b82f6','#10b981','#f59e0b','#ef4444'],
+       borderWidth:2, borderRadius:6}
+    ]);
+  }, 80);
+
+  // Cat filter
+  const allCats = [...new Set(data.map(r=>r.cat1))].sort();
+  const cf = document.getElementById('plan-cat-f');
+  if (!cf.children.length) {
+    cf.innerHTML = '<button class="fb active" onclick="setPlanCat('all',this)">Бүгд</button>' +
+      allCats.map(c=>`<button class="fb" onclick="setPlanCat('${c.replace(/'/g,"\'")}',this)">${c}</button>`).join('');
+  }
+
+  renderPlanTbl();
+}
+
+function setPlanCat(c, btn) {
+  planCat = c;
+  document.querySelectorAll('#plan-cat-f .fb').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  renderPlanTbl();
+}
+
+function renderPlanTbl() {
+  const data = (window.__PLAN__||[]).filter(r=>
+    (planCat==='all'||r.cat1===planCat) &&
+    ((r.name||'').toLowerCase().includes((document.getElementById('plan-srch').value||'').toLowerCase()))
+  );
+  const view = document.getElementById('plan-view').value;
+  const MONTHS = [5,6,7,8];
+  const MN = {5:'5-р сар',6:'6-р сар',7:'7-р сар',8:'8-р сар'};
+  const isRev  = view==='rev';
+  const isCost = view==='cost';
+
+  const vKey = m => isRev?'rev'+m:isCost?'cost_m'+m:'qty'+m;
+
+  // cost per month = qty × unit_cost
+  data.forEach(r=>{
+    MONTHS.forEach(m=>{
+      r['cost_m'+m] = Math.round((r['qty'+m]||0) * (r.cost||0));
+    });
+  });
+
+  // Ангиллаар эрэмбэлнэ
+  const sorted = [...data].sort((a,b)=>{
+    if(a.cat1!==b.cat1) return a.cat1.localeCompare(b.cat1);
+    return b.total_rev - a.total_rev;
+  });
+
+  const FS = 'style="position:sticky;bottom:0;background:var(--sur2);border-top:2px solid var(--brd);font-weight:700"';
+
+  document.getElementById('plan-tbl').innerHTML = `<thead><tr>
+    <th>#</th><th>Код</th><th>Барааны нэр</th><th>Ангилал</th>
+    <th class="num">Нийт захиалга</th>
+    <th class="num" style="color:#3b82f6">5-р сар</th>
+    <th class="num" style="color:#10b981">6-р сар</th>
+    <th class="num" style="color:#f59e0b">7-р сар</th>
+    <th class="num" style="color:#ef4444">8-р сар</th>
+    <th class="num">Нийт ${isRev?'орлого':isCost?'өртөг':'борлуулалт'}</th>
+    <th class="num">Үнэ</th><th class="num">Өртөг</th><th>Төрөл</th>
+  </tr></thead><tbody>` +
+  sorted.map((r,i) => {
+    const v = m => {
+      const val = isRev?(r['rev'+m]||0):isCost?r['cost_m'+m]:(r['qty'+m]||0);
+      return isRev||isCost?fmt(val):fN(val);
+    };
+    const tot = isRev?fmt(r.total_rev):isCost?fmt(MONTHS.reduce((s,m)=>s+r['cost_m'+m],0)):fN(r.order_qty);
+    const typ = r.is_new?'<span class="tag tg-p">🆕 Шинэ</span>':
+                r.has_stock?'<span class="tag tg-g">📦 Үлдэгдэлтэй</span>':
+                '<span class="tag tg-b">🔄 Шинэ захиалга</span>';
+    return `<tr>
+      <td><span class="rk rn">${i+1}</span></td>
+      <td><code style="font-size:10px;color:var(--mut2)">${r.code}</code></td>
+      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;cursor:default" data-name="${r.name}">${r.name}</td>
+      <td><span class="tag tg-b" style="font-size:10px">${r.cat1}</span></td>
+      <td class="num" style="font-weight:600">${fN(r.order_qty)}</td>
+      <td class="num" style="color:#3b82f6">${v(5)}</td>
+      <td class="num" style="color:#10b981">${v(6)}</td>
+      <td class="num" style="color:#f59e0b;font-weight:600">${v(7)}</td>
+      <td class="num" style="color:#ef4444">${v(8)}</td>
+      <td class="num">${tot}</td>
+      <td class="num">${r.price>0?fmt(r.price):'—'}</td>
+      <td class="num">${r.cost>0?fmt(r.cost):'—'}</td>
+      <td>${typ}</td>
+    </tr>`;
+  }).join('') + `</tbody>
+  <tfoot><tr ${FS}>
+    <td colspan="4" style="text-align:left;padding:6px 10px;color:var(--mut2);font-size:11px">
+      Нийт ${sorted.length} бараа
+    </td>
+    <td class="num">${fN(sorted.reduce((s,r)=>s+r.order_qty,0))}</td>
+    ${[5,6,7,8].map(m=>`<td class="num">${isRev?fmt(sorted.reduce((s,r)=>s+(r['rev'+m]||0),0)):isCost?fmt(sorted.reduce((s,r)=>s+r['cost_m'+m],0)):fN(sorted.reduce((s,r)=>s+(r['qty'+m]||0),0))}</td>`).join('')}
+    <td class="num">${isRev?fmt(sorted.reduce((s,r)=>s+r.total_rev,0)):isCost?fmt(sorted.reduce((s,r)=>s+[5,6,7,8].reduce((ss,m)=>ss+r['cost_m'+m],0),0)):fN(sorted.reduce((s,r)=>s+r.order_qty,0))}</td>
+    <td colspan="3"></td>
+  </tr></tfoot>`;
+}
+
+
+// ══════════════════════════════════════════════════════
+// 2026 ГҮЙЦЭТГЭЛ TAB
+// ══════════════════════════════════════════════════════
+let ACTUAL_CAT = 'all';
+const TARGET_REV = 1540000000;
+const TARGET_QTY = 10878;
+
+// Огноо шүүлтүүр тохируулах
+function setActualRange(type, btn) {
+  const today = new Date();
+  const todayStr = today.toISOString().split('T')[0];
+  const fromEl = document.getElementById('act-from');
+  const toEl   = document.getElementById('act-to');
+
+  // Бүх товчны active-г хасна
+  ['all','m5','m6','m7','m8'].forEach(k => {
+    const b = document.getElementById('act-range-'+k);
+    if(b) b.classList.remove('active');
+  });
+  if(btn) btn.classList.add('active');
+
+  if(type==='all') {
+    fromEl.value = '2026-05-20';
+    toEl.value   = todayStr;
+  } else if(type==='m5') {
+    fromEl.value = '2026-05-20';
+    toEl.value   = '2026-05-31';
+  } else if(type==='m6') {
+    fromEl.value = '2026-06-01';
+    toEl.value   = '2026-06-30';
+  } else if(type==='m7') {
+    fromEl.value = '2026-07-01';
+    toEl.value   = '2026-07-31';
+  } else if(type==='m8') {
+    fromEl.value = '2026-08-01';
+    toEl.value   = '2026-08-31';
+  }
+  renderActual();
+}
+
+// 2026 бодит дата татах
+function loadActual2026() {
+  const st = document.getElementById('act-status');
+  if(st) st.textContent = '⏳ Дата татаж байна...';
+  const cbName = '_actual' + Math.random().toString(36).slice(2);
+  const script = document.createElement('script');
+  const timer = setTimeout(()=>{
+    delete window[cbName];
+    try{document.body.removeChild(script);}catch(e){}
+    if(st) st.textContent = '⚠️ Timeout — дахин оролдоно';
+    setTimeout(loadActual2026, 10000);
+  }, 20000);
+  window[cbName] = (data) => {
+    clearTimeout(timer);
+    delete window[cbName];
+    try{document.body.removeChild(script);}catch(e){}
+    if(data.error) { if(st) st.textContent='❌ '+data.error; return; }
+    ACTUAL2026 = data;
+    const upd = data.updated ? new Date(data.updated).toLocaleTimeString() : '';
+    if(st) st.textContent = '✅ Шинэчлэгдлээ ' + upd;
+    renderActual();
+    console.log('✅ 2026 бодит дата татагдлаа', data.summary);
+  };
+  script.onerror = ()=>{
+    clearTimeout(timer); delete window[cbName];
+    try{document.body.removeChild(script);}catch(e){}
+    if(st) st.textContent='❌ Script алдаа';
+    setTimeout(loadActual2026, 10000);
+  };
+  const sep = APPS_SCRIPT_URL.includes('?')? '&':'?';
+  script.src = APPS_SCRIPT_URL+sep+'type=actual2026&callback='+cbName+'&t='+Date.now();
+  document.body.appendChild(script);
+}
+
+// Огноо range-аас шүүсэн дата авах
+function getFilteredActual() {
+  if(!ACTUAL2026) return null;
+  const fromEl = document.getElementById('act-from');
+  const toEl   = document.getElementById('act-to');
+  const from = fromEl ? fromEl.value : '2026-05-20';
+  const to   = toEl   ? toEl.value   : new Date().toISOString().split('T')[0];
+
+  // Шүүсэн нийт
+  const agg = {rev:0,qty:0,profit:0,ads:0,cost:0,ret_qty:0,gross_qty:0};
+  const daily_filtered = {};
+  Object.entries(ACTUAL2026.daily||{}).forEach(([ds,v])=>{
+    if(ds>=from && ds<=to) {
+      agg.rev+=v.rev; agg.qty+=v.qty; agg.profit+=v.profit;
+      agg.ads+=v.ads; agg.cost+=v.cost; agg.ret_qty+=v.ret_qty||0;
+      daily_filtered[ds] = v;
+    }
+  });
+  agg.profit_pct = agg.rev>0? Math.round(agg.profit/agg.rev*1000)/10:0;
+  agg.ads_pct    = agg.rev>0? Math.round(agg.ads/agg.rev*1000)/10:0;
+  agg.roas       = agg.ads>0? Math.round(agg.rev/agg.ads*10)/10:0;
+
+  // Бараа бүрийн шүүлт
+  const by_code_filtered = {};
+  (ACTUAL2026.by_code||[]).forEach(b => {
+    by_code_filtered[b.code] = {...b, rev:0,qty:0,profit:0,ads:0,cost:0,ret_qty:0,gross_qty:0};
+  });
+  // daily-аас бараагаар дахин нэгтгэхийн оронд by_code-г ашиглана
+  // by_code нийт дата → range proportion ашиглах
+  const total_rev_all = ACTUAL2026.summary.rev||1;
+  const ratio = total_rev_all>0 ? agg.rev/total_rev_all : 0;
+
+  // Бараа бүрийн жагсаалт (нийт period-аар, шүүлтгүй)
+  // Бодит дата бараагаар зөвхөн нийт period-аар л байна
+  // Filter нь зөвхөн KPI/chart-д хэрэглэнэ
+
+  return {
+    agg, daily_filtered, from, to,
+    by_code: ACTUAL2026.by_code || [],
+  };
+}
+
+// Прогнозын нийт (from-to хооронд)
+function getPlanInRange(from, to) {
+  const pd = window.__PLAN_DATA__;
+  if(!pd) return {rev:0, qty:0};
+  let rev=0, qty=0;
+  Object.entries(pd.daily_plan||{}).forEach(([ds,v])=>{
+    if(ds>=from && ds<=to) { rev+=v; }
+  });
+  // qty тооцоо — rev/нийт rev ratio-аар
+  const tot_plan_rev = Object.values(pd.daily_plan||{}).reduce((s,v)=>s+v,0)||1;
+  qty = Math.round(TARGET_QTY * rev/tot_plan_rev);
+  return {rev, qty};
+}
+
+// Өнөөдрийг хүртэлх хуримтлагдах прогноз
+function getCumPlanToToday() {
+  const pd = window.__PLAN_DATA__;
+  if(!pd) return 0;
+  const today = new Date().toISOString().split('T')[0];
+  return Object.entries(pd.daily_plan||{})
+    .filter(([ds])=>ds<='2026-'+today.slice(5))
+    .reduce((s,[,v])=>s+v, 0);
+}
+
+function renderActual() {
+  const pd = window.__PLAN_DATA__;
+  if(!ACTUAL2026 || !pd) {
+    if(!ACTUAL2026) { loadActual2026(); return; }
+    return;
+  }
+
+  const filtered = getFilteredActual();
+  if(!filtered) return;
+  const {agg, from, to} = filtered;
+
+  // Прогноз (ижил range)
+  const plan = getPlanInRange(from, to);
+
+  // ── Зорилтын явц ──
+  const cumActual = agg.rev;
+  const cumPlan   = plan.rev;
+  const pct_of_target  = Math.round(cumActual/TARGET_REV*1000)/10;
+  const pct_of_plan    = plan.rev>0? Math.round(cumActual/plan.rev*1000)/10:0;
+  const diff_rev       = cumActual - cumPlan;
+  const is_ahead       = diff_rev >= 0;
+
+  document.getElementById('act-pct-big').textContent = pct_of_target+'%';
+  document.getElementById('act-pct-big').style.color = pct_of_plan>=95?'#34d399':pct_of_plan>=80?'#fbbf24':'#f87171';
+
+  const bar_actual = Math.min(cumActual/TARGET_REV*100, 100);
+  const bar_plan   = Math.min(cumPlan/TARGET_REV*100, 100);
+  document.getElementById('act-bar-actual').style.width = bar_actual+'%';
+  document.getElementById('act-bar-plan').style.width   = bar_plan+'%';
+  document.getElementById('act-bar-label-left').textContent  = 'Бодит: '+fmt(cumActual);
+  document.getElementById('act-bar-label-plan').textContent  = 'Төлөвлөгөө ('+from.slice(5)+'-'+to.slice(5)+'): '+fmt(cumPlan);
+
+  document.getElementById('act-target-info').innerHTML =
+    `${from.slice(5)}–${to.slice(5)} хугацаанд: ` +
+    `Төлөвлөгөөний <b>${pct_of_plan}%</b> биелсэн ` +
+    `<span style="color:${is_ahead?'#34d399':'#f87171'}">(${is_ahead?'+':''}${fmt(diff_rev)})</span>`;
+
+  // ── KPI карт ──
+  const plan_qty = plan.qty;
+  const qty_diff = agg.qty - plan_qty;
+  const plan_prf = Math.round(plan.rev * 0.159);  // 2025-н ашиг % 15.9
+  const kpis = [
+    {
+      lbl:'Нийт орлого', val:fmt(agg.rev), sub:fmt(plan.rev)+' төлөвлөгөө',
+      pct:plan.rev>0?Math.round(agg.rev/plan.rev*100):0,
+      diff:diff_rev, cls:'g'
+    },
+    {
+      lbl:'Нийт ашиг', val:fmt(agg.profit),
+      sub:agg.profit_pct.toFixed(1)+'% margin',
+      pct:plan_prf>0?Math.round(agg.profit/plan_prf*100):0,
+      diff:agg.profit-plan_prf, cls:'b'
+    },
+    {
+      lbl:'Нийт захиалга', val:fN(agg.qty), sub:fN(plan_qty)+' төлөвлөгөө',
+      pct:plan_qty>0?Math.round(agg.qty/plan_qty*100):0,
+      diff:qty_diff, cls:'p', is_qty:true
+    },
+    {
+      lbl:'Ads зардал', val:fmt(agg.ads),
+      sub:agg.ads_pct.toFixed(1)+'% орлогоос',
+      pct:null, diff:null, cls:'a'
+    },
+    {
+      lbl:'ROAS', val:agg.roas.toFixed(1)+'x',
+      sub:'Ads: '+fmt(agg.ads),
+      pct:null, diff:null, cls:'b'
+    },
+    {
+      lbl:'Буцаалт', val:fN(agg.ret_qty),
+      sub:agg.gross_qty>0? Math.round(agg.ret_qty/agg.gross_qty*100)+'%':'—',
+      pct:null, diff:null, cls:'a'
+    },
+  ];
+  document.getElementById('kp-actual').innerHTML = kpis.map(k=>{
+    const pct_str = k.pct!==null?
+      `<span style="font-size:11px;color:${k.pct>=95?'#34d399':k.pct>=80?'#fbbf24':'#f87171'}">${k.pct}%</span>` : '';
+    const diff_str = k.diff!==null?
+      `<span style="color:${k.diff>=0?'#34d399':'#f87171'};font-size:10px">${k.diff>=0?'+':''}${k.is_qty?fN(k.diff):fmt(k.diff)}</span>` : '';
+    return `<div class="kpi ${k.cls}">
+      <div class="kpi-lbl">${k.lbl}</div>
+      <div class="kpi-val" style="font-size:18px">${k.val} ${pct_str}</div>
+      <div class="kpi-sub">${k.sub} ${diff_str}</div>
+    </div>`;
+  }).join('');
+
+  // ── Графикууд ──
+  setTimeout(()=>{
+    const daily_d = filtered.daily_filtered;
+    const all_dates = [];
+    let d = new Date(from);
+    const end = new Date(to);
+    while(d<=end) { all_dates.push(d.toISOString().split('T')[0]); d.setDate(d.getDate()+1); }
+
+    const actual_daily   = all_dates.map(ds=>daily_d[ds]?daily_d[ds].rev:0);
+    const plan_daily_arr = all_dates.map(ds=>(pd.daily_plan||{})[ds]||0);
+
+    // Өдрийн график
+    bC('c-actual-daily',
+      all_dates.map(d=>d.slice(5)),
+      [
+        {label:'Бодит',    data:actual_daily,   backgroundColor:'#10b98166', borderColor:'#10b981', borderWidth:2, borderRadius:3, type:'bar'},
+        {label:'Прогноз',  data:plan_daily_arr, borderColor:'#f59e0b', backgroundColor:'transparent', borderWidth:1.5, type:'line', tension:0.3, pointRadius:0},
+      ]
+    );
+
+    // Хуримтлагдах график
+    let cum_a=0, cum_p=0;
+    const cum_actual=[], cum_plan_arr=[];
+    all_dates.forEach(ds=>{
+      cum_a += daily_d[ds]?daily_d[ds].rev:0;
+      cum_p += (pd.daily_plan||{})[ds]||0;
+      cum_actual.push(cum_a);
+      cum_plan_arr.push(cum_p);
+    });
+    bC('c-actual-cum',
+      all_dates.map(d=>d.slice(5)),
+      [
+        {label:'Бодит',   data:cum_actual,   borderColor:'#10b981', backgroundColor:'#10b98122', borderWidth:2, fill:true, tension:0.3, pointRadius:0},
+        {label:'Прогноз', data:cum_plan_arr, borderColor:'#f59e0b', backgroundColor:'transparent', borderWidth:1.5, borderDash:[4,3], tension:0.3, pointRadius:0},
+      ]
+    );
+  }, 80);
+
+  // ── Ангиллын filter ──
+  const cats = [...new Set((ACTUAL2026.by_code||[]).map(b=>b.cat1))].filter(Boolean).sort();
+  const cf = document.getElementById('act-cat-f');
+  if(cf && !cf.children.length) {
+    cf.innerHTML = '<button class="fb active" onclick="setActualCat('all',this)">Бүгд</button>' +
+      cats.map(c=>`<button class="fb" onclick="setActualCat('${c.replace(/'/g,"\'")}',this)">${c}</button>`).join('');
+  }
+
+  renderActualTbl();
+}
+
+function setActualCat(c, btn) {
+  ACTUAL_CAT = c;
+  document.querySelectorAll('#act-cat-f .fb').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  renderActualTbl();
+}
+
+function renderActualTbl() {
+  if(!ACTUAL2026) return;
+  const pd = window.__PLAN_DATA__;
+  const srch = (document.getElementById('act-srch')?.value||'').toLowerCase();
+  const srt  = document.getElementById('act-srt')?.value || 'rev';
+  const diffOnly = document.getElementById('act-diff-only')?.checked;
+  const FS = 'style="position:sticky;bottom:0;background:var(--sur2);border-top:2px solid var(--brd);font-weight:700"';
+
+  let rows = (ACTUAL2026.by_code||[]).filter(b=>{
+    if(ACTUAL_CAT!=='all' && b.cat1!==ACTUAL_CAT) return false;
+    if(srch && !b.name.toLowerCase().includes(srch) && !b.code.includes(srch)) return false;
+    return true;
+  });
+
+  // Прогноз нэмнэ
+  rows = rows.map(b=>{
+    const pp = (pd?.prod_plan||{})[b.code]||{plan_rev:0, plan_qty:0};
+    const pct_rev = pp.plan_rev>0? Math.round(b.rev/pp.plan_rev*1000)/10:null;
+    const pct_qty = pp.plan_qty>0? Math.round(b.qty/pp.plan_qty*1000)/10:null;
+    const diff_rev = pp.plan_rev>0? b.rev-pp.plan_rev:null;
+    return {...b, plan_rev:pp.plan_rev, plan_qty:pp.plan_qty, pct_rev, pct_qty, diff_rev};
+  });
+
+  if(diffOnly) rows = rows.filter(b=>b.pct_rev!==null && Math.abs(100-(b.pct_rev||0))>15);
+
+  rows.sort((a,b2)=>{
+    if(srt==='rev') return b2.rev-a.rev;
+    if(srt==='qty') return b2.qty-a.qty;
+    if(srt==='profit_pct') return b2.profit_pct-a.profit_pct;
+    if(srt==='roas') return b2.roas-a.roas;
+    if(srt==='pct_rev') return (b2.pct_rev||0)-(a.pct_rev||0);
+    return b2.rev-a.rev;
+  });
+
+  const pctColor = p=>p===null?'var(--mut)':p>=100?'#34d399':p>=80?'#fbbf24':'#f87171';
+  const diffColor= v=>v===null?'':v>=0?'color:#34d399':'color:#f87171';
+
+  document.getElementById('actual-tbl').innerHTML = `<thead><tr>
+    <th>#</th><th>Код</th><th>Нэр</th><th>Ангилал</th>
+    <th class="num">Бодит борлуулалт</th><th class="num">Прогноз</th><th class="num">Биелэлт%</th><th class="num">Зөрүү</th>
+    <th class="num">Бодит тоо</th><th class="num">Прогноз тоо</th>
+    <th class="num">Ашиг%</th><th class="num">Ads%</th><th class="num">ROAS</th>
+    <th class="num">Буцаалт%</th>
+  </tr></thead><tbody>`+
+  rows.map((b,i)=>{
+    const pct_c = pctColor(b.pct_rev);
+    const diff_c= diffColor(b.diff_rev);
+    return `<tr>
+      <td><span class="rk rn">${i+1}</span></td>
+      <td style="font-size:10px;color:var(--mut2)">${b.code}</td>
+      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;cursor:default" data-name="${b.name}">${b.name}</td>
+      <td><span class="tag tg-b" style="font-size:10px">${b.cat1||'—'}</span></td>
+      <td class="num">${fmt(b.rev)}</td>
+      <td class="num" style="color:var(--mut2)">${b.plan_rev>0?fmt(b.plan_rev):'—'}</td>
+      <td class="num" style="color:${pct_c};font-weight:600">${b.pct_rev!==null?b.pct_rev+'%':'—'}</td>
+      <td class="num" style="${diff_c}">${b.diff_rev!==null?(b.diff_rev>=0?'+':'')+fmt(b.diff_rev):'—'}</td>
+      <td class="num">${fN(b.qty)}</td>
+      <td class="num" style="color:var(--mut2)">${b.plan_qty>0?fN(b.plan_qty):'—'}</td>
+      <td class="num" style="color:${b.profit_pct>15?'#34d399':b.profit_pct>8?'#fbbf24':'#f87171'}">${b.profit_pct.toFixed(1)}%</td>
+      <td class="num" style="color:${b.ads_pct>20?'#f87171':b.ads_pct>10?'#fbbf24':'var(--mut2)'}">${b.ads_pct.toFixed(1)}%</td>
+      <td class="num">${b.roas>0?b.roas.toFixed(1)+'x':'—'}</td>
+      <td class="num" style="color:${b.ret_pct>5?'#f87171':'var(--mut2)'}">${b.ret_pct>0?b.ret_pct.toFixed(1)+'%':'—'}</td>
+    </tr>`;
+  }).join('')+`</tbody>
+  <tfoot><tr ${FS}>
+    <td colspan="4" style="text-align:left;padding:6px 10px;color:var(--mut2);font-size:11px">Нийт ${rows.length} бараа</td>
+    <td class="num">${fmt(rows.reduce((s,r)=>s+r.rev,0))}</td>
+    <td class="num">${fmt(rows.reduce((s,r)=>s+r.plan_rev,0))}</td>
+    <td class="num">${rows.reduce((s,r)=>s+r.plan_rev,0)>0?Math.round(rows.reduce((s,r)=>s+r.rev,0)/rows.reduce((s,r)=>s+r.plan_rev,0)*1000)/10+'%':'—'}</td>
+    <td class="num">${fmt(rows.reduce((s,r)=>s+(r.diff_rev||0),0))}</td>
+    <td class="num">${fN(rows.reduce((s,r)=>s+r.qty,0))}</td>
+    <td class="num">${fN(rows.reduce((s,r)=>s+r.plan_qty,0))}</td>
+    <td colspan="4"></td>
+  </tr></tfoot>`;
 }
 
 // ══════════════════════════════════════
@@ -1782,6 +2300,14 @@ function init() {
   document.body.appendChild(script);
 }
 init();
+// Actual tab-ын default огноо тохируулах
+(function(){
+  const today = new Date().toISOString().split('T')[0];
+  const fromEl = document.getElementById('act-from');
+  const toEl   = document.getElementById('act-to');
+  if(fromEl) fromEl.value = '2026-05-20';
+  if(toEl)   toEl.value   = today;
+})();
 
 // Sheet2-г 5 минут тутам дахин татна
 // 5 минут тутам Sheet2+HIST шинэчилнэ
@@ -1858,5 +2384,6 @@ function applyHistData(data) {
   }
 }
 </script>
+<script>window.__PLAN_DATA__={"daily_plan":{"2026-07-01":24141470,"2026-07-03":33514929,"2026-07-04":28937288,"2026-07-05":50566277,"2026-07-06":62153341,"2026-07-07":60599236,"2026-07-08":97529216,"2026-07-09":142765695,"2026-07-10":193729459,"2026-07-11":94134083,"2026-07-12":72980292,"2026-07-13":61365329,"2026-07-14":65454826,"2026-07-15":43380523,"2026-06-24":8707985,"2026-06-30":13105315,"2026-07-02":21384922,"2026-07-17":23334524,"2026-05-20":21731603,"2026-07-16":20480350,"2026-07-18":10948491,"2026-07-19":8379230,"2026-07-21":8276622,"2026-07-22":10647632,"2026-07-23":14585700,"2026-07-24":11958662,"2026-07-25":11010255,"2026-07-26":11948701,"2026-07-28":6272221,"2026-07-30":6565109,"2026-08-02":4741025,"2026-08-06":11814208,"2026-08-07":11942720,"2026-08-08":5321822,"2026-05-27":4293722,"2026-06-20":8626295,"2026-06-22":8506748,"2026-06-23":9567724,"2026-07-27":8105270,"2026-06-28":9309706,"2026-08-15":2962767,"2026-06-09":1726454,"2026-06-19":5363665,"2026-06-27":7581258,"2026-06-29":16236444,"2026-07-29":7275418,"2026-07-31":5936493,"2026-08-01":9476076,"2026-08-03":8637256,"2026-08-09":4557722,"2026-08-10":4237934,"2026-08-17":1878877,"2026-08-27":1719481,"2026-08-28":1526214,"2026-08-31":1640780,"2026-06-25":6525262,"2026-05-22":2134905,"2026-05-23":526005,"2026-05-29":1913744,"2026-06-06":2587190,"2026-06-10":2916940,"2026-06-12":1323982,"2026-06-14":5561914,"2026-06-15":1968538,"2026-06-16":4126356,"2026-06-17":5831891,"2026-06-18":3159024,"2026-06-21":5854803,"2026-07-20":4604544,"2026-05-26":309825,"2026-05-28":642563,"2026-05-30":2930888,"2026-05-31":2672866,"2026-06-01":1965547,"2026-06-02":459258,"2026-06-04":3903201,"2026-06-05":1578017,"2026-06-11":1375784,"2026-06-13":833839,"2026-06-26":5045869,"2026-08-05":9062643,"2026-08-04":7250510,"2026-05-21":3226767,"2026-05-24":599728,"2026-05-25":2940849,"2026-08-12":6129761,"2026-08-19":1067951,"2026-06-07":1108798,"2026-06-08":1108798,"2026-08-16":6800221,"2026-08-11":3397119,"2026-08-25":1912747,"2026-08-13":3402102,"2026-06-03":831846,"2026-08-14":5356691,"2026-08-18":2610105,"2026-08-20":1564070,"2026-08-23":1651737,"2026-08-24":1377776,"2026-08-26":1540160,"2026-08-29":1313021,"2026-08-30":1085883,"2026-08-21":153419,"2026-08-22":179320},"cum_plan":{"2026-05-20":21731603,"2026-05-21":24958370,"2026-05-22":27093275,"2026-05-23":27619280,"2026-05-24":28219008,"2026-05-25":31159857,"2026-05-26":31469682,"2026-05-27":35763404,"2026-05-28":36405967,"2026-05-29":38319711,"2026-05-30":41250599,"2026-05-31":43923465,"2026-06-01":45889012,"2026-06-02":46348270,"2026-06-03":47180116,"2026-06-04":51083317,"2026-06-05":52661334,"2026-06-06":55248524,"2026-06-07":56357322,"2026-06-08":57466120,"2026-06-09":59192574,"2026-06-10":62109514,"2026-06-11":63485298,"2026-06-12":64809280,"2026-06-13":65643119,"2026-06-14":71205033,"2026-06-15":73173571,"2026-06-16":77299927,"2026-06-17":83131818,"2026-06-18":86290842,"2026-06-19":91654507,"2026-06-20":100280802,"2026-06-21":106135605,"2026-06-22":114642353,"2026-06-23":124210077,"2026-06-24":132918062,"2026-06-25":139443324,"2026-06-26":144489193,"2026-06-27":152070451,"2026-06-28":161380157,"2026-06-29":177616601,"2026-06-30":190721916,"2026-07-01":214863386,"2026-07-02":236248308,"2026-07-03":269763237,"2026-07-04":298700525,"2026-07-05":349266802,"2026-07-06":411420143,"2026-07-07":472019379,"2026-07-08":569548595,"2026-07-09":712314290,"2026-07-10":906043749,"2026-07-11":1000177832,"2026-07-12":1073158124,"2026-07-13":1134523453,"2026-07-14":1199978279,"2026-07-15":1243358802,"2026-07-16":1263839152,"2026-07-17":1287173676,"2026-07-18":1298122167,"2026-07-19":1306501397,"2026-07-20":1311105941,"2026-07-21":1319382563,"2026-07-22":1330030195,"2026-07-23":1344615895,"2026-07-24":1356574557,"2026-07-25":1367584812,"2026-07-26":1379533513,"2026-07-27":1387638783,"2026-07-28":1393911004,"2026-07-29":1401186422,"2026-07-30":1407751531,"2026-07-31":1413688024,"2026-08-01":1423164100,"2026-08-02":1427905125,"2026-08-03":1436542381,"2026-08-04":1443792891,"2026-08-05":1452855534,"2026-08-06":1464669742,"2026-08-07":1476612462,"2026-08-08":1481934284,"2026-08-09":1486492006,"2026-08-10":1490729940,"2026-08-11":1494127059,"2026-08-12":1500256820,"2026-08-13":1503658922,"2026-08-14":1509015613,"2026-08-15":1511978380,"2026-08-16":1518778601,"2026-08-17":1520657478,"2026-08-18":1523267583,"2026-08-19":1524335534,"2026-08-20":1525899604,"2026-08-21":1526053023,"2026-08-22":1526232343,"2026-08-23":1527884080,"2026-08-24":1529261856,"2026-08-25":1531174603,"2026-08-26":1532714763,"2026-08-27":1534434244,"2026-08-28":1535960458,"2026-08-29":1537273479,"2026-08-30":1538359362,"2026-08-31":1540000142},"prod_plan":{"106692":{"name":"\u041c\u0430\u0439\u0445\u0430\u043d CM096","cat1":"\u041c\u0430\u0439\u0445\u0430\u043d","cat2":"\u0423\u0433\u0441\u0430\u0440\u0447 \u0431\u0430\u0440\u044c\u0434\u0430\u0433","plan_rev":10958450,"plan_qty":20,"plan_cost":6384000,"price":550000.0,"cost":319200.0},"107034":{"name":"inflation pump \u0433\u0430\u0440 \u043d\u0430\u0441\u043e\u0441 \u0445\u0438\u0439\u043b\u0434\u044d\u0433 \u0433\u0443\u0434\u0430\u0441\u043d\u044b","cat1":"\u0425\u0438\u0439\u043b\u044d\u0433\u0447","cat2":"\u0413\u0430\u0440","plan_rev":318791,"plan_qty":20,"plan_cost":157500,"price":16000.0,"cost":7875.0},"10703601":{"name":"\u04e8\u04e9\u0440\u04e9\u04e9 \u0445\u0438\u0439\u043b\u044d\u0433\u0434\u0434\u044d\u0433 2 \u0445\u04af\u043d\u0438\u0439 \u0433\u0443\u0434\u0430\u0441_1","cat1":"\u0425\u0438\u0439\u043b\u0434\u044d\u0433 \u0433\u0443\u0434\u0430\u0441","cat2":"\u04e8\u04e9\u0440\u04e9\u04e9 \u0445\u0438\u0439\u043b\u044d\u0433\u0434\u0434\u044d\u0433","plan_rev":6734466,"plan_qty":40,"plan_cost":4452000,"price":169000.0,"cost":111300.0},"107037":{"name":"\u0410\u044f\u043d\u044b \u0442\u043e\u0433\u043e\u043e\u043d\u044b \u043a\u043e\u043c travel set","cat1":"\u0413\u0430\u043b \u0442\u043e\u0433\u043e\u043e\u043d\u044b \u0445\u044d\u0440\u044d\u0433\u0441\u044d\u043b","cat2":"\u0422\u043e\u0433\u043e\u043e","plan_rev":3436969,"plan_qty":30,"plan_cost":2060100,"price":115000.0,"cost":68670.0},"107038":{"name":"Electric air pump 12V \u0433\u0443\u0434\u0430\u0441 \u0445\u0438\u0439\u043b\u044d\u0433\u0447","cat1":"\u0425\u0438\u0439\u043b\u044d\u0433\u0447","cat2":"\u0410\u0432\u0442\u043e\u043c\u0430\u0442","plan_rev":2092068,"plan_qty":60,"plan_cost":1008000,"price":35000.0,"cost":16800.0},"110217":{"name":"\u0410\u044f\u043d\u044b \u0447\u0438\u0439\u0433 \u0442\u0430\u0442\u0434\u0430\u0433\u0433\u04af\u0439 \u0433\u0443\u0434\u0430\u0441- \u0437\u04e9\u04e9\u043b\u04e9\u043d","cat1":"\u0427\u0438\u0439\u0433\u043d\u0438\u0439 \u0433\u0443\u0434\u0430\u0441","cat2":"\u041d\u0438\u043c\u0433\u044d\u043d","plan_rev":866714,"plan_qty":30,"plan_cost":362250,"price":29000.0,"cost":12075.0},"110222":{"name":"\u041e\u043b\u043e\u043d \u04af\u0439\u043b\u0434\u044d\u043b\u0442 \u0445\u04af\u0440\u0437","cat1":"\u0410\u044f\u043d\u044b \u0431\u0430\u0433\u0430\u0436","cat2":"nan","plan_rev":468225,"plan_qty":5,"plan_cost":270375,"price":94000.0,"cost":54075.0},"110223":{"name":"\u0410\u044f\u043b\u0430\u043b\u044b\u043d \u0434\u04af\u04af\u0436\u0438\u043d \u043e\u0440","cat1":"\u0410\u044f\u043d\u044b \u043e\u0440","cat2":"\u0414\u04af\u04af\u0436\u0438\u043d","plan_rev":871695,"plan_qty":35,"plan_cost":422625,"price":25000.0,"cost":12075.0},"110227":{"name":"\u0410\u044f\u043d\u044b \u044d\u0432\u0445\u0434\u044d\u0433 \u0441\u0430\u043d\u0434\u0430\u043b, \u0413\u0430\u0440 \u0442\u0430\u0432\u0438\u0443\u0440\u0442\u0430\u0439, \u0442\u04af\u0448\u043b\u044d\u0433\u0442\u044d\u0439 100\u043a\u0433 \u0434\u0430\u0430\u0446\u0442\u0430\u0439","cat1":"\u0421\u0430\u043d\u0434\u0430\u043b","cat2":"\u0414\u0430\u0430\u0446\u044b\u043d","plan_rev":1344901,"plan_qty":30,"plan_cost":945000,"price":45000.0,"cost":31500.0},"110367":{"name":"\u042d\u0432\u0445\u0434\u044d\u0433 \u0441\u04af\u04af\u0434\u0440\u044d\u0432\u0447 2.4x2.4 \u0445\u044d\u043c\u0436\u044d\u044d\u0442\u044d\u0439","cat1":"\u0421\u04af\u04af\u0434\u0440\u044d\u0432\u0447","cat2":"4 \u0445\u04e9\u043b\u0442\u044d\u0439 \u0442\u043e\u043c","plan_rev":2525425,"plan_qty":15,"plan_cost":1417500,"price":169000.0,"cost":94500.0},"112107":{"name":"\u0417\u04e9\u04e9\u0432\u0440\u0438\u0439\u043d \u0448\u04af\u0440\u0448\u04af\u04af\u0440, \u0446\u044d\u043d\u044d\u0433\u043b\u044d\u0434\u044d\u0433","cat1":"\u0428\u04af\u0440\u0448\u04af\u04af\u0440","cat2":"\u041c\u043e\u0442\u043e\u0440\u0442\u043e\u0439","plan_rev":4722096,"plan_qty":60,"plan_cost":2331120,"price":79000.0,"cost":38852.0},"11211301":{"name":"\u0428\u04af\u0440\u0448\u04af\u04af\u0440\u0438\u0439\u043d \u043c\u0430\u0439\u0445\u0430\u043d 1.2","cat1":"\u0428\u04af\u0440\u0448\u04af\u04af\u0440\u0438\u0439\u043d \u043c\u0430\u0439\u0445\u0430\u043d","cat2":"1.2 \u043c\u0435\u0442\u0435\u0440","plan_rev":5419452,"plan_qty":80,"plan_cost":2452800,"price":68000.0,"cost":30660.0},"11211302":{"name":"\u0428\u04af\u0440\u0448\u04af\u04af\u0440\u0438\u0439\u043d \u043c\u0430\u0439\u0445\u0430\u043d 1.5","cat1":"\u0428\u04af\u0440\u0448\u04af\u04af\u0440\u0438\u0439\u043d \u043c\u0430\u0439\u0445\u0430\u043d","cat2":"1.5 \u043c\u0435\u0442\u0435\u0440","plan_rev":9324645,"plan_qty":120,"plan_cost":4444680,"price":78000.0,"cost":37039.0},"112228":{"name":"\u0410\u044f\u043d\u044b \u0442\u0443\u043b\u0433\u0430","cat1":"\u0413\u0430\u043b \u0442\u043e\u0433\u043e\u043e\u043d\u044b \u0445\u044d\u0440\u044d\u0433\u0441\u044d\u043b","cat2":"\u0422\u0443\u043b\u0433\u0430","plan_rev":699348,"plan_qty":18,"plan_cost":358560,"price":39000.0,"cost":19920.0},"112231":{"name":"1 \u0445\u04af\u043d\u0438\u0439 \u0445\u0438\u0439\u043b\u0434\u044d\u0433 \u0433\u0443\u0434\u0430\u0441 Intex","cat1":"\u0425\u0438\u0439\u043b\u0434\u044d\u0433 \u0433\u0443\u0434\u0430\u0441","cat2":"\u0413\u0430\u0440\u0430\u0430\u0440 \u0445\u0438\u0439\u043b\u0434\u044d\u0433","plan_rev":1464447,"plan_qty":30,"plan_cost":720000,"price":49000.0,"cost":24000.0},"112309":{"name":"\u0410\u044f\u043d\u044b \u0441\u0430\u043d\u0434\u0430\u043b \u0431\u04e9\u04e9\u0440\u04e9\u043d\u0445\u0438\u0439 \u0445\u044d\u043b\u0431\u044d\u0440\u0442\u044d\u0439 , \u0410\u0432\u0447 \u044f\u0432\u0430\u0445\u0430\u0434 \u0430\u0432\u0441\u0430\u0430\u0440\u0445\u0430\u043d, \u044d\u0432\u0445\u044d\u0433\u0434\u0434\u044d\u0433, \u0443\u0443\u0442\u0442\u0430\u0439, \u0445\u0430\u0436\u0443\u0443\u0434","cat1":"\u0421\u0430\u043d\u0434\u0430\u043b","cat2":"\u0416\u0438\u0436\u0438\u0433","plan_rev":7670915,"plan_qty":221,"plan_cost":3248700,"price":35000.0,"cost":14700.0},"112317":{"name":"\u0428\u043e\u0440\u043b\u043e\u0433\u043d\u044b \u043d\u04af\u04af\u0440\u0441, Lokkii-Premium BBQ briquettes 3\u043a\u0433","cat1":"\u0413\u0430\u043b \u0442\u043e\u0433\u043e\u043e\u043d\u044b \u0445\u044d\u0440\u044d\u0433\u0441\u044d\u043b","cat2":"\u0428\u043e\u0440\u043b\u043e\u0433\u043d\u044b \u043d\u04af\u04af\u0440\u0441","plan_rev":1992446,"plan_qty":80,"plan_cost":1092000,"price":25000.0,"cost":13650.0},"112452":{"name":"saaral ungutei 8 c zuzaantai","cat1":"\u0425\u0438\u0439\u043b\u0434\u044d\u0433 \u0433\u0443\u0434\u0430\u0441","cat2":"\u04e8\u04e9\u0440\u04e9\u04e9 \u0445\u0438\u0439\u043b\u044d\u0433\u0434\u0434\u044d\u0433","plan_rev":6724504,"plan_qty":30,"plan_cost":4709250,"price":225000.0,"cost":156975.0},"112456":{"name":"\u0425\u04af\u04af\u0445\u0434\u0438\u0439\u043d \u0431\u0430\u0441\u0441\u0435\u0439\u043d , \u0411\u04e9\u043c\u0431\u04e9\u0433\u0442\u044d\u0439, \u0417\u0443\u043d\u044b \u0445\u0430\u043b\u0443\u0443\u043d \u04e9\u0434\u0440\u04af\u04af\u0434\u0438\u0439\u0433 \u0441\u044d\u0440\u04af\u04af\u0446\u04af\u04af\u043b\u043d\u044d","cat1":"\u0425\u04af\u04af\u0445\u0434\u0438\u0439\u043d \u0445\u04e9\u0432\u04e9\u0433\u0447, \u0431\u0430\u0441\u0441\u0435\u0439\u043d","cat2":"nan","plan_rev":11058073,"plan_qty":60,"plan_cost":5040000,"price":185000.0,"cost":84000.0},"112457":{"name":"\u0425\u04af\u04af\u0445\u0434\u0438\u0439\u043d \u0430\u044f\u043d\u044b \u0441\u0430\u043d\u0434\u0430\u043b \u0413\u0430\u0440\u044b\u043d \u0442\u0430\u0432\u0438\u0443\u0440\u0442\u0430\u0439 \u0410\u044f\u0433\u0430 \u0445\u0438\u0439\u0445 \u0437\u043e\u0440\u0438\u0443\u043b\u0430\u043b\u0442\u044b\u043d \u0445\u044d\u0441\u044d\u0433\u0442\u044d\u0439 , \u0411\u0440\u0435\u0437\u0435\u043d\u0442","cat1":"\u0421\u0430\u043d\u0434\u0430\u043b","cat2":"\u0425\u04af\u04af\u0445\u0434\u0438\u0439\u043d","plan_rev":896600,"plan_qty":30,"plan_cost":477240,"price":30000.0,"cost":15908.0},"112548":{"name":"\u041c\u0430\u0439\u0445\u0430\u043d 6-8 \u0445\u04af\u043d\u0438\u0439 SKYMAN","cat1":"\u041c\u0430\u0439\u0445\u0430\u043d","cat2":"\u0423\u0433\u0441\u0430\u0440\u0447 \u0431\u0430\u0440\u044c\u0434\u0430\u0433","plan_rev":30285172,"plan_qty":80,"plan_cost":19488000,"price":380000.0,"cost":243600.0},"112999":{"name":"\u0412\u043e\u043b\u0435\u0439\u0431\u043e\u043b\u044b\u043d \u0431\u04e9\u043c\u0431\u04e9\u0433 \u0413\u0430\u0440 \u0431\u04e9\u043c\u0431\u04e9\u0433 Volleyball, 361\u1d52, \u21165 \u0441\u0442\u0430\u043d\u0434\u0430\u0440\u0442, \u0417\u04e9\u04e9\u043b\u04e9\u043d \u0430\u0440","cat1":"\u0411\u0443\u0441\u0430\u0434","cat2":"\u0413\u0430\u0440 \u0431\u04e9\u043c\u0431\u04e9\u0433","plan_rev":757129,"plan_qty":20,"plan_cost":371280,"price":38000.0,"cost":18564.0},"115993":{"name":"hurz dood tl har","cat1":"\u0410\u044f\u043d\u044b \u0431\u0430\u0433\u0430\u0436","cat2":"nan","plan_rev":443319,"plan_qty":5,"plan_cost":267750,"price":89000.0,"cost":53550.0},"116001":{"name":"emoko 2 hunii mishock saaral ulaan","cat1":"\u0410\u044f\u043d\u044b \u0445\u04e9\u043d\u0436\u0438\u043b","cat2":"2 \u0445\u04af\u043d\u0438\u0439","plan_rev":2291312,"plan_qty":20,"plan_cost":1260000,"price":115000.0,"cost":63000.0},"116007":{"name":"\u0413\u0430\u0437\u0430\u043d \u043f\u043b\u0438\u0442\u043aa\u043d\u0438\u0439 \u0441\u0430\u043b\u0445\u0438\u043d\u044b \u0445\u0430\u0430\u043b\u0442","cat1":"\u0413\u0430\u043b \u0442\u043e\u0433\u043e\u043e\u043d\u044b \u0445\u044d\u0440\u044d\u0433\u0441\u044d\u043b","cat2":"\u0413\u0430\u0437\u044b\u043d \u043f\u043b\u0438\u0442\u043a\u0430\u043d\u044b \u0441\u0430\u043b\u0445\u0438\u043d\u044b \u0445\u0430\u0430\u043b\u0442","plan_rev":757129,"plan_qty":40,"plan_cost":464720,"price":19000.0,"cost":11618.0},"116009":{"name":"shar vnetei gazan plitka","cat1":"\u0413\u0430\u043b \u0442\u043e\u0433\u043e\u043e\u043d\u044b \u0445\u044d\u0440\u044d\u0433\u0441\u044d\u043b","cat2":"\u0413\u0430\u0437\u044b\u043d \u043f\u043b\u0438\u0442\u043a\u0430","plan_rev":1474410,"plan_qty":20,"plan_cost":928200,"price":74000.0,"cost":46410.0},"116011":{"name":"mah havchij sharagch tomor","cat1":"\u0413\u0430\u043b \u0442\u043e\u0433\u043e\u043e\u043d\u044b \u0445\u044d\u0440\u044d\u0433\u0441\u044d\u043b","cat2":"\u041c\u0430\u0445 \u0448\u0430\u0440\u0430\u0433\u0447","plan_rev":268980,"plan_qty":15,"plan_cost":116025,"price":18000.0,"cost":7735.0},"116016":{"name":"20 yuan gaz hoshuu","cat1":"\u0413\u0430\u043b \u0442\u043e\u0433\u043e\u043e\u043d\u044b \u0445\u044d\u0440\u044d\u0433\u0441\u044d\u043b","cat2":"\u0413\u0430\u0437\u044b\u043d \u0445\u043e\u0448\u0443\u0443","plan_rev":358640,"plan_qty":20,"plan_cost":218620,"price":18000.0,"cost":10931.0},"116020":{"name":"krt 103 tsenher maihan \u043c\u0430\u0439\u0445\u0430\u043d","cat1":"\u041c\u0430\u0439\u0445\u0430\u043d","cat2":"\u0423\u0433\u0441\u0430\u0440\u0447 \u0431\u0430\u0440\u044c\u0434\u0430\u0433","plan_rev":3775684,"plan_qty":10,"plan_cost":2094750,"price":379000.0,"cost":209475.0},"116027":{"name":"nogoon sandaltai jijig shireetei com","cat1":"\u0421\u0430\u043d\u0434\u0430\u043b, \u0448\u0438\u0440\u044d\u044d\u043d\u0438\u0439 \u043a\u043e\u043c","cat2":"nan","plan_rev":2175751,"plan_qty":13,"plan_cost":1489111,"price":168000.0,"cost":114547.0},"116028":{"name":"tsagaan sandaltai shireenii com","cat1":"\u0421\u0430\u043d\u0434\u0430\u043b, \u0448\u0438\u0440\u044d\u044d\u043d\u0438\u0439 \u043a\u043e\u043c","cat2":"nan","plan_rev":12452785,"plan_qty":100,"plan_cost":8137500,"price":125000.0,"cost":81375.0},"116031":{"name":"camp master 115","cat1":"\u0421\u0430\u043d\u0434\u0430\u043b","cat2":"\u0414\u0430\u0430\u0446\u044b\u043d","plan_rev":7571293,"plan_qty":80,"plan_cost":4025760,"price":95000.0,"cost":50322.0},"116036":{"name":"3 ongiin sandal","cat1":"\u0421\u0430\u043d\u0434\u0430\u043b","cat2":"\u0414\u0430\u0430\u0446\u044b\u043d","plan_rev":2988668,"plan_qty":40,"plan_cost":1995000,"price":75000.0,"cost":49875.0},"116238":{"name":"\u043d\u0430\u0440\u0430\u0430\u0440 \u0442\u043e\u0433\u043e\u043e\u0440 \u0430\u0436\u0438\u043b\u0434\u0430\u0433 \u0433\u044d\u0440\u044d\u043b tsenher ongotei","cat1":"\u0413\u044d\u0440\u044d\u043b","cat2":"nan","plan_rev":1424599,"plan_qty":26,"plan_cost":622752,"price":55000.0,"cost":23952.0},"116240":{"name":"5 garalttai chanar sain gazan plitka","cat1":"\u0413\u0430\u043b \u0442\u043e\u0433\u043e\u043e\u043d\u044b \u0445\u044d\u0440\u044d\u0433\u0441\u044d\u043b","cat2":"\u0413\u0430\u0437\u044b\u043d \u043f\u043b\u0438\u0442\u043a\u0430","plan_rev":314806,"plan_qty":4,"plan_cost":194140,"price":79000.0,"cost":48535.0},"116243":{"name":"nogoon  shiddeg maihan. 5/6  \u043c\u0430\u0439\u0445\u0430\u043d","cat1":"\u041c\u0430\u0439\u0445\u0430\u043d","cat2":"\u0428\u0438\u0434\u0434\u044d\u0433","plan_rev":5359678,"plan_qty":20,"plan_cost":4042500,"price":269000.0,"cost":202125.0},"116244":{"name":"2 \u0442\u0430\u043b\u0434\u0430\u0430 \u0442\u0430\u0432\u0446\u0430\u043d\u0442\u0430\u0439 \u043d\u043e\u0433\u043e\u043e\u043d \u0448\u043e\u0440\u043b\u043e\u0433\u043d\u044b \u0437\u0443\u0443\u0445","cat1":"\u0413\u0430\u043b \u0442\u043e\u0433\u043e\u043e\u043d\u044b \u0445\u044d\u0440\u044d\u0433\u0441\u044d\u043b","cat2":"\u0428\u043e\u0440\u043b\u043e\u0433\u043d\u044b \u0437\u0443\u0443\u0445","plan_rev":651530,"plan_qty":6,"plan_cost":422130,"price":109000.0,"cost":70355.0},"116246":{"name":"2 \u0442\u0430\u043b\u0434\u0430\u0430 \u0442\u0430\u0432\u0446\u0430\u043d\u0442\u0430\u0439 \u044d\u0432\u0445\u0434\u044d\u0433 \u0445\u0430\u0440 \u0436\u0438\u0436\u0438\u0433 \u0448\u043e\u0440\u043b\u043e\u0433\u043d\u044b \u0437\u0443\u0443\u0445","cat1":"\u0413\u0430\u043b \u0442\u043e\u0433\u043e\u043e\u043d\u044b \u0445\u044d\u0440\u044d\u0433\u0441\u044d\u043b","cat2":"\u0428\u043e\u0440\u043b\u043e\u0433\u043d\u044b \u0437\u0443\u0443\u0445","plan_rev":6296128,"plan_qty":80,"plan_cost":3696000,"price":79000.0,"cost":46200.0},"116248":{"name":"\u0445\u04af\u04af\u0445\u0434\u0438\u0439\u043d \u0445\u0438\u0439\u043b\u0434\u044d\u0433 \u0445\u04e9\u0432\u04e9\u0433\u0447 \u0430\u043c\u044c\u0442\u0430\u043d\u0442\u0430\u0439","cat1":"\u0425\u04af\u04af\u0445\u0434\u0438\u0439\u043d \u0445\u04e9\u0432\u04e9\u0433\u0447, \u0431\u0430\u0441\u0441\u0435\u0439\u043d","cat2":"nan","plan_rev":298867,"plan_qty":20,"plan_cost":162920,"price":15000.0,"cost":8146.0},"116249":{"name":"\u0425\u04af\u04af\u0445\u0434\u0438\u0439\u043d \u0445\u0438\u0439\u043b\u0434\u044d\u0433 \u0441\u04af\u04af\u0434\u0440\u044d\u0432\u0447\u0442\u044d\u0439 \u0431\u0430\u0441\u0441\u0435\u0439\u043d","cat1":"\u0425\u04af\u04af\u0445\u0434\u0438\u0439\u043d \u0445\u04e9\u0432\u04e9\u0433\u0447, \u0431\u0430\u0441\u0441\u0435\u0439\u043d","cat2":"nan","plan_rev":4981114,"plan_qty":40,"plan_cost":2980960,"price":125000.0,"cost":74524.0},"116250":{"name":"\u044f\u043b\u0430\u0430 \u0448\u0443\u043c\u0443\u0443\u043b \u04af\u0440\u0433\u044d\u044d\u0433\u0447swe","cat1":"\u0411\u0443\u0441\u0430\u0434","cat2":"\u042f\u043b\u0430\u0430, \u0448\u0443\u043c\u0443\u0443\u043b \u04af\u0440\u0433\u044d\u044d\u0433\u0447","plan_rev":4333569,"plan_qty":150,"plan_cost":2291700,"price":29000.0,"cost":15278.0},"116252":{"name":"\u0433\u044d\u0440\u044d\u043b 2 20","cat1":"\u0413\u044d\u0440\u044d\u043b","cat2":"nan","plan_rev":398489,"plan_qty":20,"plan_cost":220500,"price":20000.0,"cost":11025.0},"116253":{"name":"\u0433\u044d\u0440\u044d\u043b 3 25","cat1":"\u0413\u044d\u0440\u044d\u043b","cat2":"nan","plan_rev":2008385,"plan_qty":72,"plan_cost":1001736,"price":28000.0,"cost":13913.0},"116254":{"name":"krt116 \u043c\u0430\u0439\u0445\u0430\u043d","cat1":"\u041c\u0430\u0439\u0445\u0430\u043d","cat2":"\u0423\u0433\u0441\u0430\u0440\u0447 \u0431\u0430\u0440\u044c\u0434\u0430\u0433","plan_rev":13249763,"plan_qty":20,"plan_cost":9568100,"price":665000.0,"cost":478405.0},"116256":{"name":"\u0443\u0443\u0440\u0433\u0430\u043d \u0433\u044d\u0440\u044d\u043b \u0445\u0430\u0439\u0440\u0446\u0430\u0433\u0442\u0430\u0439 88","cat1":"\u0413\u044d\u0440\u044d\u043b","cat2":"nan","plan_rev":11954673,"plan_qty":160,"plan_cost":6972000,"price":75000.0,"cost":43575.0},"11625902":{"name":"\u0445\u0438\u0439\u043b\u0434\u044d\u0433 \u0433\u0443\u0434\u0430\u0441 40\u0441\u043c 200x180","cat1":"\u0425\u0438\u0439\u043b\u0434\u044d\u0433 \u0433\u0443\u0434\u0430\u0441","cat2":"\u04e8\u04e9\u0440\u04e9\u04e9 \u0445\u0438\u0439\u043b\u044d\u0433\u0434\u0434\u044d\u0433","plan_rev":76709153,"plan_qty":351,"plan_cost":45884475,"price":220000.0,"cost":130725.0},"11625901":{"name":"\u0445\u0438\u0439\u043b\u0434\u044d\u0433 \u0433\u0443\u0434\u0430\u0441 40\u0441\u043c 200x150","cat1":"\u0425\u0438\u0439\u043b\u0434\u044d\u0433 \u0433\u0443\u0434\u0430\u0441","cat2":"\u04e8\u04e9\u0440\u04e9\u04e9 \u0445\u0438\u0439\u043b\u044d\u0433\u0434\u0434\u044d\u0433","plan_rev":44830024,"plan_qty":251,"plan_cost":26803035,"price":180000.0,"cost":106785.0},"116259":{"name":"\u0445\u0438\u0439\u043b\u0434\u044d\u0433 \u0433\u0443\u0434\u0430\u0441 40\u0441\u043c 190x90","cat1":"\u0425\u0438\u0439\u043b\u0434\u044d\u0433 \u0433\u0443\u0434\u0430\u0441","cat2":"\u04e8\u04e9\u0440\u04e9\u04e9 \u0445\u0438\u0439\u043b\u044d\u0433\u0434\u0434\u044d\u0433","plan_rev":5778092,"plan_qty":40,"plan_cost":3362840,"price":145000.0,"cost":84071.0},"116261":{"name":"krt 115 hiildeg maihan","cat1":"\u041c\u0430\u0439\u0445\u0430\u043d","cat2":"\u0425\u0438\u0439\u043b\u0434\u044d\u0433","plan_rev":6873937,"plan_qty":6,"plan_cost":4687200,"price":1150000.0,"cost":781200.0},"116753":{"name":"6-8 \u0445\u04af\u043d\u0438\u0439 \u0442\u043e\u043c \u043c\u0430\u0439\u0445\u0430\u043d, 19\u043c\u043c \u0442\u04e9","cat1":"\u041c\u0430\u0439\u0445\u0430\u043d","cat2":"\u0423\u0433\u0441\u0430\u0440\u0447 \u0431\u0430\u0440\u044c\u0434\u0430\u0433","plan_rev":23510857,"plan_qty":80,"plan_cost":16380000,"price":295000.0,"cost":204750.0},"130608":{"name":"\u0410\u044f\u043b\u0430\u043b\u044b\u043d \u0445\u0430\u043b\u0431\u0430\u0433\u0430 \u0441\u044d\u0440\u044d\u044d, \u0445\u0443\u0442\u0433\u0443\u0443\u0440\u044b\u043d \u043a\u043e\u043c Kitchen set , \u0413\u0430\u0434\u0443\u0443\u0440\u0430\u0430 \u0446\u0430\u0445\u0438\u043b\u0433\u0430\u0430\u043d\u0442\u0430\u0439 \u0446\u04af\u043d\u0445\u0442\u044d\u0439, \u0433\u0430\u043d\u0431\u0430\u043d\u0437, \u0445","cat1":"\u0413\u0430\u043b \u0442\u043e\u0433\u043e\u043e\u043d\u044b \u0445\u044d\u0440\u044d\u0433\u0441\u044d\u043b","cat2":"\u0425\u0430\u043b\u0431\u0430\u0433\u0430 \u0441\u044d\u0440\u044d\u044d\u043d\u0438\u0439 \u043a\u043e\u043c","plan_rev":11556184,"plan_qty":401,"plan_cost":7029530,"price":29000.0,"cost":17530.0},"130609":{"name":"\u0410\u044f\u0433\u0430 \u0442\u0430\u0432\u0430\u0433\u043d\u044b \u043a\u043e\u043c, 48 \u0448\u0438\u0440\u0445\u044d\u0433\u0442\u044d\u0439, \u044d\u043a\u043e \u043c\u0430\u0442\u0435\u0440\u0438\u0430\u043b\u0442\u0430\u0439","cat1":"\u0413\u0430\u043b \u0442\u043e\u0433\u043e\u043e\u043d\u044b \u0445\u044d\u0440\u044d\u0433\u0441\u044d\u043b","cat2":"\u0410\u044f\u0433\u0430, \u0442\u0430\u0432\u0430\u0433\u043d\u044b \u043a\u043e\u043c","plan_rev":2092068,"plan_qty":60,"plan_cost":1468440,"price":35000.0,"cost":24474.0},"131926":{"name":"\u0410\u044f\u043b\u0430\u043b\u044b\u043d \u044d\u0432\u0445\u044d\u0433\u0434\u0434\u044d\u0433 \u0442\u04af\u0440\u0434\u044d\u0433 \u0442\u044d\u0440\u044d\u0433, \u0425\u044d\u0440\u044d\u0433\u0446\u044d\u044d\u0442 \u0431\u04af\u0445 \u0437\u04af\u0439\u043b\u0441\u044d\u044d \u0431\u0430\u0433\u0442\u0430\u0430\u043d","cat1":"\u0413\u0430\u043b \u0442\u043e\u0433\u043e\u043e\u043d\u044b \u0445\u044d\u0440\u044d\u0433\u0441\u044d\u043b","cat2":"\u0426\u04af\u043d\u0445","plan_rev":5778092,"plan_qty":40,"plan_cost":2897800,"price":145000.0,"cost":72445.0},"131968":{"name":"\u0410\u044f\u043d\u044b \u0433\u044d\u0440\u044d\u043b 1464 \u0445\u0430\u043f\u043f\u0438 \u0445\u0430\u0443\u0441","cat1":"\u0413\u044d\u0440\u044d\u043b","cat2":"nan","plan_rev":3347308,"plan_qty":80,"plan_cost":1722000,"price":42000.0,"cost":21525.0},"135595":{"name":"1452 happy house \u0430\u044f\u043d\u044b \u0441\u0430\u043d\u0434\u0430\u043b","cat1":"\u0421\u0430\u043d\u0434\u0430\u043b","cat2":"\u0414\u0430\u0430\u0446\u044b\u043d","plan_rev":2540368,"plan_qty":30,"plan_cost":1349460,"price":85000.0,"cost":44982.0},"15366401":{"name":"\u0410\u044f\u043d\u044b \u0445\u04e9\u0440\u0433\u04af\u04af\u0440 15L","cat1":"\u0425\u04e9\u0440\u0433\u04af\u04af\u0440","cat2":"\u0425\u04af\u0439\u0442\u044d\u043d \u0431\u0430\u0440\u0438\u0433\u0447","plan_rev":2072143,"plan_qty":40,"plan_cost":851600,"price":52000.0,"cost":21290.0},"15366402":{"name":"\u0410\u044f\u043d\u044b \u0445\u04e9\u0440\u0433\u04af\u04af\u0440 25L","cat1":"\u0425\u04e9\u0440\u0433\u04af\u04af\u0440","cat2":"\u0425\u04af\u0439\u0442\u044d\u043d \u0431\u0430\u0440\u0438\u0433\u0447","plan_rev":4303682,"plan_qty":60,"plan_cost":2173920,"price":72000.0,"cost":36232.0},"153673":{"name":"\u0410\u044f\u043d\u044b \u0445\u04e9\u0432\u04e9\u043d \u0434\u04af\u04af\u0440\u0433\u044d\u043b\u0442\u0442\u044d\u0439 \u0431\u0430\u043c\u0431\u0430\u0433\u0430\u0440 \u0441\u0430\u043d\u0434\u0430\u043b , Padded Camping Chair, T","cat1":"\u0421\u0430\u043d\u0434\u0430\u043b","cat2":"\u0414\u0430\u0430\u0446 \u0434\u0443\u043d\u0434","plan_rev":3287535,"plan_qty":60,"plan_cost":1716960,"price":55000.0,"cost":28616.0},"153674":{"name":"\u0410\u044f\u043d\u044b \u0441\u0430\u043d\u0434\u0430\u043b\t","cat1":"\u0421\u0430\u043d\u0434\u0430\u043b","cat2":"\u0414\u0430\u0430\u0446 \u0434\u0443\u043d\u0434","plan_rev":1344901,"plan_qty":30,"plan_cost":737100,"price":45000.0,"cost":24570.0},"153687":{"name":"\u0414\u0430\u043d \u0448\u0438\u0440\u044d\u044d Tanlook","cat1":"\u0428\u0438\u0440\u044d\u044d","cat2":"\u0416\u0438\u0436\u0438\u0433","plan_rev":2659915,"plan_qty":30,"plan_cost":1584060,"price":89000.0,"cost":52802.0},"153690":{"name":"\t\u0410\u044f\u043d\u044b \u0441\u0430\u043d\u0434\u0430\u043b Tanlook","cat1":"\u0421\u0430\u043d\u0434\u0430\u043b","cat2":"\u0414\u0430\u0430\u0446 \u0434\u0443\u043d\u0434","plan_rev":1574032,"plan_qty":20,"plan_cost":910080,"price":79000.0,"cost":45504.0},"154684":{"name":"\u0413\u044d\u0440 \u043c\u0430\u0439\u0445\u0430\u043d Nature camping KRT-113,","cat1":"\u041c\u0430\u0439\u0445\u0430\u043d","cat2":"\u0410\u0441\u0430\u0440 \u043c\u0430\u0439\u0445\u0430\u043d","plan_rev":6923748,"plan_qty":10,"plan_cost":4781940,"price":695000.0,"cost":478194.0},"154686":{"name":"4 \u0445\u04af\u043d\u0438\u0439 \u043c\u0430\u0439\u0445\u0430\u043d Nature camping","cat1":"\u041c\u0430\u0439\u0445\u0430\u043d","cat2":"\u0423\u0433\u0441\u0430\u0440\u0447 \u0431\u0430\u0440\u044c\u0434\u0430\u0433","plan_rev":4981114,"plan_qty":20,"plan_cost":3087000,"price":250000.0,"cost":154350.0},"154691":{"name":"\u0411\u0430\u043c\u0431\u0430\u0433\u0430\u0440 \u043d\u043e\u0433\u043e\u043e\u043d \u0441\u0430\u043d\u0434\u0430\u043b TUYA-TRAVEL\t","cat1":"\u0421\u0430\u043d\u0434\u0430\u043b","cat2":"\u0414\u0430\u0430\u0446 \u0434\u0443\u043d\u0434","plan_rev":1165581,"plan_qty":30,"plan_cost":713310,"price":39000.0,"cost":23777.0},"154692":{"name":"\u0428\u043e\u0440\u043b\u043e\u0433\u043d\u044b \u0437\u0443\u0443\u0445 \u0446\u0430\u0433\u0430\u0430\u043d \u0448\u0430\u0440\u0433\u0430\u043b TUYA-TRAVE","cat1":"\u0413\u0430\u043b \u0442\u043e\u0433\u043e\u043e\u043d\u044b \u0445\u044d\u0440\u044d\u0433\u0441\u044d\u043b","cat2":"\u0428\u043e\u0440\u043b\u043e\u0433\u043d\u044b \u0437\u0443\u0443\u0445","plan_rev":8368271,"plan_qty":120,"plan_cost":5166000,"price":70000.0,"cost":43050.0},"154694":{"name":"\u0425\u0430\u043b\u0430\u0430\u0433\u0443\u0443\u0440 \u0413\u0430\u0437\u0430\u043d \u043f\u043b\u0438\u0442\u043a\u0430 TUYA-TRAVEL","cat1":"\u0413\u0430\u043b \u0442\u043e\u0433\u043e\u043e\u043d\u044b \u0445\u044d\u0440\u044d\u0433\u0441\u044d\u043b","cat2":"\u0413\u0430\u0437\u044b\u043d \u043f\u043b\u0438\u0442\u043a\u0430","plan_rev":11835126,"plan_qty":120,"plan_cost":6835560,"price":99000.0,"cost":56963.0},"154696":{"name":"\u04e8\u04e9\u0440\u04e9\u04e9 \u0445\u0438\u0439\u043b\u044d\u0433\u0434\u0434\u044d\u0433 \u0431\u0443\u0439\u0434\u0430\u043d, \u0413\u0430\u043d\u0446 \u0442\u043e\u0432\u0447\u043b\u0443\u0443\u0440 \u0434\u0430\u0440\u0430\u0430\u0434 \u043b 3-5 \u043c\u0438\u043d\u0443\u0442\u0430\u043d\u0434 \u0445\u0438\u0439\u043b\u044d\u0433\u0434\u044d\u043d\u044d,40\u0441\u043c \u0437\u0443\u0437\u0430\u0430\u043d\u0442\u0430\u0439,","cat1":"\u0410\u044f\u043d\u044b \u043e\u0440","cat2":"\u0425\u0438\u0439\u043b\u0434\u044d\u0433","plan_rev":5105642,"plan_qty":25,"plan_cost":3264250,"price":205000.0,"cost":130570.0},"154698":{"name":"\u0411\u0430\u0440\u0438\u0443\u043b\u0442\u0430\u0439 \u0433\u0430\u0437\u043d\u044b \u0445\u043e\u0448\u0443\u0443 \u041c\u0430\u0442\u0435\u0440\u0438\u0430\u043b \u0441\u0430\u0439\u0442\u0430\u0439","cat1":"\u0413\u0430\u043b \u0442\u043e\u0433\u043e\u043e\u043d\u044b \u0445\u044d\u0440\u044d\u0433\u0441\u044d\u043b","cat2":"\u0413\u0430\u0437\u044b\u043d \u0445\u043e\u0448\u0443\u0443","plan_rev":866714,"plan_qty":30,"plan_cost":539040,"price":29000.0,"cost":17968.0},"154700":{"name":"\u0410\u044f\u043d\u044b \u043c\u0435\u0448\u043e\u043a 1 \u0445\u04af\u043d\u0438\u0439\u0445 154700","cat1":"\u0410\u044f\u043d\u044b \u0445\u04e9\u043d\u0436\u0438\u043b","cat2":"1 \u0445\u04af\u043d\u0438\u0439","plan_rev":5180358,"plan_qty":80,"plan_cost":2775120,"price":65000.0,"cost":34689.0},"154701":{"name":"\u0410\u044f\u043d\u044b \u043c\u0435\u0448\u043e\u043a 1 \u0445\u04af\u043d\u0438\u0439\u0445 154701","cat1":"\u0410\u044f\u043d\u044b \u0445\u04e9\u043d\u0436\u0438\u043b","cat2":"1 \u0445\u04af\u043d\u0438\u0439","plan_rev":2749575,"plan_qty":40,"plan_cost":1640560,"price":69000.0,"cost":41014.0},"154702":{"name":"\u0410\u044f\u043d\u044b \u043c\u0435\u0448\u043e\u043a 1 \u0445\u04af\u043d\u0438\u0439\u0445 , Coleman \u0431\u0440\u044d\u043d\u0434\u0438\u0439\u043d \u0430\u044f","cat1":"\u0410\u044f\u043d\u044b \u0445\u04e9\u043d\u0436\u0438\u043b","cat2":"1 \u0445\u04af\u043d\u0438\u0439","plan_rev":9762983,"plan_qty":201,"plan_cost":5030427,"price":49000.0,"cost":25027.0},"154704":{"name":"\u0410\u044f\u043d\u044b \u043c\u0435\u0448\u043e\u043a 1 \u0445\u04af\u043d\u0438\u0439\u0445 154704","cat1":"\u0410\u044f\u043d\u044b \u0445\u04e9\u043d\u0436\u0438\u043b","cat2":"1 \u0445\u04af\u043d\u0438\u0439","plan_rev":7571293,"plan_qty":80,"plan_cost":4698720,"price":95000.0,"cost":58734.0},"154705":{"name":"1 \u0445\u04af\u043d\u0438\u0439 \u043c\u0435\u0448\u043e\u043a Nature camping, \u04e8\u0440\u0433\u04e9\u043d \u0437\u0430\u0433\u0432\u0430\u0440\u0442\u0430\u0439, \u0414\u0443\u043b\u0430\u0430\u0445\u0430\u043d","cat1":"\u0410\u044f\u043d\u044b \u0445\u04e9\u043d\u0436\u0438\u043b","cat2":"1 \u0445\u04af\u043d\u0438\u0439","plan_rev":6296128,"plan_qty":80,"plan_cost":4032000,"price":79000.0,"cost":50400.0},"154707":{"name":"2 \u0445\u04af\u043d\u0438\u0439 \u043c\u0435\u0448\u043e\u043a , \u0410\u044f\u043d\u044b \u0445\u04e9\u043d\u0436\u0438\u043b, \u0410\u0432\u0447 \u044f\u0432\u0430\u0445\u0430\u0434 \u0430\u0432\u0441\u0430\u0430\u0440\u0445\u0430\u043d, 2 \u0434\u044d\u0440\u0442","cat1":"\u0410\u044f\u043d\u044b \u0445\u04e9\u043d\u0436\u0438\u043b","cat2":"2 \u0445\u04af\u043d\u0438\u0439","plan_rev":7571293,"plan_qty":80,"plan_cost":4620000,"price":95000.0,"cost":57750.0},"154708":{"name":"Coleman 2 \u0445\u04af\u043d\u0438\u0439 \u0430\u044f\u043d\u044b \u0445\u04e9\u043d\u0436\u0438\u043b, \u0414\u0443\u043b\u0430\u0430\u0445\u0430\u043d \u0442\u0430\u0432 \u0442\u0443\u0445\u0442\u0430\u0439 , \u0421\u0430\u043b\u0433\u0430\u0436 \u0431\u043e\u043b\u0434","cat1":"\u0410\u044f\u043d\u044b \u0445\u04e9\u043d\u0436\u0438\u043b","cat2":"2 \u0445\u04af\u043d\u0438\u0439","plan_rev":19924455,"plan_qty":160,"plan_cost":12348000,"price":125000.0,"cost":77175.0},"154710":{"name":"\u0410\u044f\u043d\u044b \u043c\u0435\u0448\u043e\u043a 1 \u0445\u04af\u043d\u0438\u0439\u0445 154710","cat1":"\u0410\u044f\u043d\u044b \u0445\u04e9\u043d\u0436\u0438\u043b","cat2":"1 \u0445\u04af\u043d\u0438\u0439","plan_rev":3735835,"plan_qty":50,"plan_cost":2257500,"price":75000.0,"cost":45150.0},"154711":{"name":"\u0410\u044f\u043d\u044b \u0445\u04e9\u043d\u0436\u0438\u043b  154711","cat1":"\u0410\u044f\u043d\u044b \u0445\u04e9\u043d\u0436\u0438\u043b","cat2":"1 \u0445\u04af\u043d\u0438\u0439","plan_rev":2789424,"plan_qty":40,"plan_cost":1659000,"price":70000.0,"cost":41475.0},"154864":{"name":"\u0410\u044f\u043d\u044b \u043e\u0440, Travel ail\t","cat1":"\u0410\u044f\u043d\u044b \u043e\u0440","cat2":"\u0421\u0442\u0430\u043d\u0434\u0430\u0440\u0442","plan_rev":9484041,"plan_qty":80,"plan_cost":5407360,"price":119000.0,"cost":67592.0},"154865":{"name":"\u0410\u044f\u043d\u044b \u043e\u0440, Travel ail\t","cat1":"\u0410\u044f\u043d\u044b \u043e\u0440","cat2":"\u0421\u0442\u0430\u043d\u0434\u0430\u0440\u0442","plan_rev":2570255,"plan_qty":20,"plan_cost":1554000,"price":129000.0,"cost":77700.0},"154867":{"name":"4 \u0442\u0430\u043b\u0442 \u0430\u0441\u0430\u0440 \u0441\u04af\u04af\u0434\u0440\u044d\u0432\u0447","cat1":"\u0421\u04af\u04af\u0434\u0440\u044d\u0432\u0447","cat2":"4 \u0445\u04e9\u043b\u0442\u044d\u0439 \u0442\u043e\u043c","plan_rev":23251839,"plan_qty":60,"plan_cost":16191000,"price":389000.0,"cost":269850.0},"15487601":{"name":"\u041c\u0430\u0448\u0438\u043d\u044b \u0441\u04af\u04af\u0434\u0440\u044d\u0432\u0447, Travel ail 3*2.5","cat1":"\u0421\u04af\u04af\u0434\u0440\u044d\u0432\u0447","cat2":"\u041c\u0430\u0448\u0438\u043d\u044b","plan_rev":3347308,"plan_qty":8,"plan_cost":2158288,"price":420000.0,"cost":269786.0},"15487602":{"name":"\u041c\u0430\u0448\u0438\u043d\u044b \u0441\u04af\u04af\u0434\u0440\u044d\u0432\u0447, Travel ail 3*2","cat1":"\u0421\u04af\u04af\u0434\u0440\u044d\u0432\u0447","cat2":"\u041c\u0430\u0448\u0438\u043d\u044b","plan_rev":4662323,"plan_qty":12,"plan_cost":2968416,"price":390000.0,"cost":247368.0},"155446":{"name":"\u0410\u044f\u043d\u044b \u043f\u043b\u0438\u0442\u043a\u0430, 4000W \u0434\u0443\u043b\u0430\u0430\u043d \u044f\u043b\u0433\u0430\u0440\u0443\u0443\u043b\u0430\u0445 \u0447\u0430\u0434\u0430\u043b\u0442\u0430\u0439, \u044d\u0432\u0445\u044d\u0433\u0434\u0434\u044d\u0433 \u0445\u04e9\u043b\u0442\u044d\u0439, \u0430\u0432\u0447 \u044f\u0432\u0430\u0445\u0430\u0434 \u0430\u0432\u0441\u0430\u0430\u0440","cat1":"\u0413\u0430\u043b \u0442\u043e\u0433\u043e\u043e\u043d\u044b \u0445\u044d\u0440\u044d\u0433\u0441\u044d\u043b","cat2":"\u0413\u0430\u0437\u044b\u043d \u043f\u043b\u0438\u0442\u043a\u0430","plan_rev":12592256,"plan_qty":160,"plan_cost":6555360,"price":79000.0,"cost":40971.0},"155452":{"name":"\u0410\u044f\u043d\u044b \u0446\u04af\u043d\u0445  \u041c\u0430\u0442\u0435\u0440\u0438\u0430\u043b \u0431\u043e\u043b \u0433\u043e\u0451 \u044e\u043c \u0431\u043d\u0430\u0430","cat1":"\u0413\u0430\u043b \u0442\u043e\u0433\u043e\u043e\u043d\u044b \u0445\u044d\u0440\u044d\u0433\u0441\u044d\u043b","cat2":"\u0426\u04af\u043d\u0445","plan_rev":2789424,"plan_qty":80,"plan_cost":1365840,"price":35000.0,"cost":17073.0},"155456":{"name":"\u04e9\u04e9\u0432\u0440\u0438\u0439\u043d \u0448\u04af\u0440\u0448\u04af\u04af\u0440, \u0437\u044d\u0432\u044d\u0440\u0434\u044d\u0433\u0433\u04af\u0439 \u0433\u0430\u043d \u043c\u0430\u0442\u0435\u0440\u0438\u0430\u043b\u0442\u0430\u0439 \u0448\u04af\u0440\u0448\u04af\u04af\u0440\u0438\u0439\u043d \u0442\u043e\u043b\u0433\u043e\u0439, \u0423\u0441\u043d\u044b \u0433\u0440\u0430\u0434\u0443\u0441 \u0437\u0430\u0430\u0433\u0447 \u0434\u044d\u043b\u0433\u044d\u0446\u0442\u044d\u0439, 5000mah battery, 3 \u0442\u04af\u0432\u0448\u043d\u0438\u0439 \u0443\u0441 \u0433\u0430\u0440\u0433\u0430\u0445 \u0442\u043e\u0445\u0438\u0440\u0443\u0443\u043b\u0433\u0430\u0442\u0430\u0439","cat1":"\u0428\u04af\u0440\u0448\u04af\u04af\u0440","cat2":"\u041c\u043e\u0442\u043e\u0440\u0442\u043e\u0439","plan_rev":5230170,"plan_qty":50,"plan_cost":2932150,"price":105000.0,"cost":58643.0},"155467":{"name":"\u0410\u044f\u043d\u044b \u0433\u044d\u0440\u044d\u043b, \u043d\u0430\u0440\u0430\u0430\u0440 \u0446\u044d\u043d\u044d\u0433\u043b\u044d\u0434\u044d\u0433, 6 \u0442\u04e9\u0440\u043b\u04e9\u04e9\u0440 \u0430\u0441\u0434\u0430","cat1":"\u0413\u044d\u0440\u044d\u043b","cat2":"nan","plan_rev":1992446,"plan_qty":80,"plan_cost":811680,"price":25000.0,"cost":10146.0},"155488":{"name":"\u0410\u044f\u043d\u044b \u0448\u04af\u0440\u0448\u04af\u04af\u0440, \u043d\u0430\u0440\u0430\u0430\u0440 \u0445\u0430\u043b\u0434\u0430\u0433, 20 \u043b\u0438\u0442\u0440\u0438\u0439\u043d \u0431\u0430\u0433\u0442\u0430\u0430\u043c\u0436","cat1":"\u0428\u04af\u0440\u0448\u04af\u04af\u0440","cat2":"\u041c\u043e\u0442\u043e\u0440\u0433\u04af\u0439","plan_rev":6973559,"plan_qty":201,"plan_cost":3620814,"price":35000.0,"cost":18014.0},"155501":{"name":"\u04e8\u04e9\u0440\u04e9\u04e9 \u0445\u0438\u0439\u043b\u044d\u0433\u0434\u0434\u044d\u0433 \u043c\u0430\u0448\u0438\u043d\u044b \u0433\u0443\u0434\u0430\u0441, \u041e\u0432\u043e\u0440 \u0445\u044d\u043c\u0436\u044d\u044d \u0431\u0430\u0433\u0430\u0442\u0430\u0439 \u0430\u0432\u0447 \u044f\u0432\u0430\u0445\u0430\u0434 \u0430\u0432\u0441\u0430\u0430\u0440\u0445\u0430\u043d \u0443\u0443\u0442\u0442\u0430","cat1":"\u0425\u0438\u0439\u043b\u0434\u044d\u0433 \u0433\u0443\u0434\u0430\u0441","cat2":"\u041c\u0430\u0448\u0438\u043d\u044b","plan_rev":7471671,"plan_qty":60,"plan_cost":3820320,"price":125000.0,"cost":63672.0},"155538":{"name":"\u0410\u044f\u043d\u044b \u0442\u0443\u043b\u0433\u0430","cat1":"\u0413\u0430\u043b \u0442\u043e\u0433\u043e\u043e\u043d\u044b \u0445\u044d\u0440\u044d\u0433\u0441\u044d\u043b","cat2":"\u0422\u0443\u043b\u0433\u0430","plan_rev":1101822,"plan_qty":14,"plan_cost":603680,"price":79000.0,"cost":43120.0},"156828":{"name":"\u0410\u044f\u043d\u044b \u0448\u0438\u0440\u044d\u044d, \u042d\u0432\u0445\u044d\u0433\u0434\u0434\u044d\u0433 \u0437\u0430\u0439 \u0442\u0430\u043b\u0431\u0430\u0439 \u0431\u0430\u0433\u0430 \u044d\u0437\u043b\u044d \u041c\u0430\u0442\u0435\u0440\u0438\u0430\u043b \u0434\u0430\u0432\u0433\u04af\u0439 \u0433\u043e\u0451 \u0438\u0440\u0441\u044d\u043d","cat1":"\u0428\u0438\u0440\u044d\u044d","cat2":"\u0416\u0438\u0436\u0438\u0433","plan_rev":10958450,"plan_qty":201,"plan_cost":5387001,"price":55000.0,"cost":26801.0},"156830":{"name":"\u0410\u044f\u043d\u044b \u0437\u04e9\u04e9\u0432\u0440\u0438\u0439\u043d \u0436\u0438\u043c\u0441, \u0430\u043c\u0442\u0442\u0430\u043d\u044b \u0441\u0430\u0432 2\u0448 \u0445\u0430\u043b\u0431\u0430\u0433\u0430, \u0441\u044d\u0440\u044d\u044d\u0442\u044d\u0439, \u0414\u043e\u0442\u043e\u0440 \u0442\u0430\u043b\u0434\u0430\u0430 6\u0448 \u0441\u0430\u0432\u0442\u0430\u0439, \u0411\u0438\u0442\u04af\u04af\u043c\u0436\u043b\u044d\u043b \u0441\u0430\u0439\u0442\u0430\u0439 \u0442\u0430\u0433\u0442\u0430\u0439, \u0431\u0430\u0440\u0438\u0443\u043b\u0442\u0430\u0439","cat1":"\u0413\u0430\u043b \u0442\u043e\u0433\u043e\u043e\u043d\u044b \u0445\u044d\u0440\u044d\u0433\u0441\u044d\u043b","cat2":"\u0410\u044f\u0433\u0430, \u0442\u0430\u0432\u0430\u0433\u043d\u044b \u043a\u043e\u043c","plan_rev":375576,"plan_qty":13,"plan_cost":143546,"price":29000.0,"cost":11042.0},"157673":{"name":"\u041d\u0430\u0440\u0430\u0430\u0440 \u0446\u044d\u043d\u044d\u0433\u043b\u044d\u0434\u044d\u0433, \u0433\u0430\u0440 \u0447\u0438\u0439\u0434\u044d\u043d\u0442\u044d\u0439 Powerbank, \u0437\u04e9\u04e9\u0432\u0440\u0438\u0439\u043d \u0446\u044d\u043d\u044d\u0433\u043b\u044d\u0433\u0447, 20000 mah","cat1":"\u0411\u0443\u0441\u0430\u0434","cat2":"\u041f\u043e\u0432\u0435\u0440\u0431\u0430\u043d\u043a","plan_rev":1394712,"plan_qty":40,"plan_cost":422120,"price":35000.0,"cost":10553.0},"160143":{"name":"\u041c\u0430\u0439\u0445\u0430\u043d travel top 1917","cat1":"\u041c\u0430\u0439\u0445\u0430\u043d","cat2":"\u0423\u0433\u0441\u0430\u0440\u0447 \u0431\u0430\u0440\u044c\u0434\u0430\u0433","plan_rev":3287535,"plan_qty":20,"plan_cost":1762920,"price":165000.0,"cost":88146.0},"16015401":{"name":"\u0425\u0438\u0439\u043b\u0434\u044d\u0433 \u0433\u0443\u0434\u0430\u0441 3\u043d \u0442\u04e9\u0440\u04e9\u043b\u0442\u044d\u0439 200\u0445180","cat1":"\u0425\u0438\u0439\u043b\u0434\u044d\u0433 \u0433\u0443\u0434\u0430\u0441","cat2":"\u04e8\u04e9\u0440\u04e9\u04e9 \u0445\u0438\u0439\u043b\u044d\u0433\u0434\u0434\u044d\u0433","plan_rev":45188665,"plan_qty":241,"plan_cost":25305000,"price":189000.0,"cost":105000.0},"16015402":{"name":"\u0425\u0438\u0439\u043b\u0434\u044d\u0433 \u0433\u0443\u0434\u0430\u0441 3\u043d \u0442\u04e9\u0440\u04e9\u043b\u0442\u044d\u0439 200\u0445150","cat1":"\u0425\u0438\u0439\u043b\u0434\u044d\u0433 \u0433\u0443\u0434\u0430\u0441","cat2":"\u04e8\u04e9\u0440\u04e9\u04e9 \u0445\u0438\u0439\u043b\u044d\u0433\u0434\u0434\u044d\u0433","plan_rev":56406133,"plan_qty":381,"plan_cost":32004000,"price":149000.0,"cost":84000.0},"16015403":{"name":"\u0425\u0438\u0439\u043b\u0434\u044d\u0433 \u0433\u0443\u0434\u0430\u0441 3\u043d \u0442\u04e9\u0440\u04e9\u043b\u0442\u044d\u0439  190x100\t","cat1":"\u0425\u0438\u0439\u043b\u0434\u044d\u0433 \u0433\u0443\u0434\u0430\u0441","cat2":"\u04e8\u04e9\u0440\u04e9\u04e9 \u0445\u0438\u0439\u043b\u044d\u0433\u0434\u0434\u044d\u0433","plan_rev":4742020,"plan_qty":40,"plan_cost":2693680,"price":119000.0,"cost":67342.0},"160651":{"name":"\u0428\u0438\u0440\u044d\u044d \u0441\u0430\u043d\u0434\u0430\u043b\u043d\u044b \u043a\u043e\u043c 6 \u0441\u0430\u043d\u0434\u0430\u043b\u0442\u0430\u0439, \u0410\u0432\u0447 \u044f\u0432\u0430\u0445\u0430\u0434 \u0430\u0432\u0441\u0430\u0430\u0440\u0445\u0430\u043d, \u0422\u043e\u043c \u0448\u0438\u0440\u044d\u044d\u0442\u044d\u0439","cat1":"\u0428\u0438\u0440\u044d\u044d, \u0441\u0430\u043d\u0434\u0430\u043b\u043d\u044b \u043a\u043e\u043c","cat2":"nan","plan_rev":10101699,"plan_qty":60,"plan_cost":5985000,"price":169000.0,"cost":99750.0},"16065201":{"name":"\u0410\u044f\u043d\u044b \u0434\u044d\u0432\u0441\u0433\u044d\u0440 / \u0427\u0438\u0439\u0433\u043d\u0438\u0439 \u0433\u0443\u0434\u0430\u0441, 200*300","cat1":"\u0427\u0438\u0439\u0433\u043d\u0438\u0439 \u0433\u0443\u0434\u0430\u0441","cat2":"\u0417\u0443\u0437\u0430\u0430\u043d","plan_rev":2361048,"plan_qty":30,"plan_cost":1645890,"price":79000.0,"cost":54863.0},"16065202":{"name":"\u0410\u044f\u043d\u044b \u0434\u044d\u0432\u0441\u0433\u044d\u0440 / \u0427\u0438\u0439\u0433\u043d\u0438\u0439 \u0433\u0443\u0434\u0430\u0441, 180*200","cat1":"\u0427\u0438\u0439\u0433\u043d\u0438\u0439 \u0433\u0443\u0434\u0430\u0441","cat2":"\u041d\u0438\u043c\u0433\u044d\u043d","plan_rev":1464447,"plan_qty":30,"plan_cost":1000140,"price":49000.0,"cost":33338.0},"16065301":{"name":"\u0410\u044f\u043d\u044b \u0441\u04af\u04af\u0434\u0440\u044d\u0432\u0447 300*450        ","cat1":"\u0421\u04af\u04af\u0434\u0440\u044d\u0432\u0447","cat2":"2 \u0445\u04e9\u043b\u0442\u044d\u0439 \u043e\u0432\u043e\u0440 \u0436\u0438\u0436\u0438\u0433","plan_rev":9165249,"plan_qty":80,"plan_cost":5250000,"price":115000.0,"cost":65625.0},"16065302":{"name":"\u0410\u044f\u043d\u044b \u0441\u04af\u04af\u0434\u0440\u044d\u0432\u0447 450*600          ","cat1":"\u0421\u04af\u04af\u0434\u0440\u044d\u0432\u0447","cat2":"2 \u0445\u04e9\u043b\u0442\u044d\u0439 \u043e\u0432\u043e\u0440 \u0436\u0438\u0436\u0438\u0433","plan_rev":10390603,"plan_qty":70,"plan_cost":6174000,"price":149000.0,"cost":88200.0},"16098601":{"name":"\u0410\u044f\u043d\u044b \u0445\u04e9\u0440\u0433\u04af\u04af\u0440, 3hos","cat1":"\u0425\u04e9\u0440\u0433\u04af\u04af\u0440","cat2":"\u0425\u04af\u0439\u0442\u044d\u043d \u0431\u0430\u0440\u0438\u0433\u0447","plan_rev":6734466,"plan_qty":40,"plan_cost":4008840,"price":169000.0,"cost":100221.0},"16098602":{"name":"\u0410\u044f\u043d\u044b \u0445\u04e9\u0440\u0433\u04af\u04af\u0440, 26l","cat1":"\u0425\u04e9\u0440\u0433\u04af\u04af\u0440","cat2":"\u0425\u04af\u0439\u0442\u044d\u043d \u0431\u0430\u0440\u0438\u0433\u0447","plan_rev":7870160,"plan_qty":100,"plan_cost":5355000,"price":79000.0,"cost":53550.0},"16098603":{"name":"\u0410\u044f\u043d\u044b \u0445\u04e9\u0440\u0433\u04af\u04af\u0440, 13l","cat1":"\u0425\u04e9\u0440\u0433\u04af\u04af\u0440","cat2":"\u0425\u04af\u0439\u0442\u044d\u043d \u0431\u0430\u0440\u0438\u0433\u0447","plan_rev":5877714,"plan_qty":100,"plan_cost":2887500,"price":59000.0,"cost":28875.0},"16098604":{"name":"\u0410\u044f\u043d\u044b \u0445\u04e9\u0440\u0433\u04af\u04af\u0440, 5l","cat1":"\u0425\u04e9\u0440\u0433\u04af\u04af\u0440","cat2":"\u0425\u04af\u0439\u0442\u044d\u043d \u0431\u0430\u0440\u0438\u0433\u0447","plan_rev":2889046,"plan_qty":100,"plan_cost":1785000,"price":29000.0,"cost":17850.0},"16147701":{"name":"\u041c\u0430\u0448\u0438\u043d\u044b \u0434\u0430\u0430\u0432\u0443\u0443\u043d \u0431\u043e\u043a\u0441 \u0442\u043e\u043c","cat1":"\u041c\u0430\u0448\u0438\u043d\u044b \u0431\u043e\u043a\u0441","cat2":"\u0414\u0430\u0430\u0432\u0443\u0443\u043d","plan_rev":8542610,"plan_qty":35,"plan_cost":4893000,"price":245000.0,"cost":139800.0},"16147702":{"name":"\u041c\u0430\u0448\u0438\u043d\u044b \u0434\u0430\u0430\u0432\u0443\u0443\u043d \u0431\u043e\u043a\u0441 \u0436\u0438\u0436\u0438\u0433","cat1":"\u041c\u0430\u0448\u0438\u043d\u044b \u0431\u043e\u043a\u0441","cat2":"\u0414\u0430\u0430\u0432\u0443\u0443\u043d","plan_rev":3212818,"plan_qty":15,"plan_cost":2026125,"price":215000.0,"cost":135075.0},"16147801":{"name":"\u041c\u0430\u0448\u0438\u043d\u044b \u0431\u043e\u043a\u0441 \u0434\u0430\u0430\u0432\u0443\u0443\u043d","cat1":"\u041c\u0430\u0448\u0438\u043d\u044b \u0431\u043e\u043a\u0441","cat2":"\u0414\u0430\u0430\u0432\u0443\u0443\u043d","plan_rev":9912416,"plan_qty":50,"plan_cost":6352500,"price":199000.0,"cost":127050.0},"16147802":{"name":"\u041c\u0430\u0448\u0438\u043d\u044b \u0431\u043e\u043a\u0441 \u0434\u0430\u0430\u0432\u0443\u0443\u043d","cat1":"\u041c\u0430\u0448\u0438\u043d\u044b \u0431\u043e\u043a\u0441","cat2":"\u0414\u0430\u0430\u0432\u0443\u0443\u043d","plan_rev":3566477,"plan_qty":20,"plan_cost":2331000,"price":179000.0,"cost":116550.0},"16172301":{"name":"\u0427\u0438\u0439\u0433\u043d\u0438\u0439 \u0433\u0443\u0434\u0430\u0441 1\u0441\u043c \u0437\u0443\u0437\u0430\u0430\u043d\u0442\u0430\u0439 180*200","cat1":"\u0427\u0438\u0439\u0433\u043d\u0438\u0439 \u0433\u0443\u0434\u0430\u0441","cat2":"\u041d\u0438\u043c\u0433\u044d\u043d","plan_rev":9862605,"plan_qty":221,"plan_cost":5337150,"price":45000.0,"cost":24150.0},"16172302":{"name":"\u0427\u0438\u0439\u0433\u043d\u0438\u0439 \u0433\u0443\u0434\u0430\u0441 1\u0441\u043c \u0437\u0443\u0437\u0430\u0430\u043d\u0442\u0430\u0439 150*200","cat1":"\u0427\u0438\u0439\u0433\u043d\u0438\u0439 \u0433\u0443\u0434\u0430\u0441","cat2":"\u0417\u0443\u0437\u0430\u0430\u043d","plan_rev":3108215,"plan_qty":80,"plan_cost":1806000,"price":39000.0,"cost":22575.0},"161745":{"name":"\u0410\u044f\u0433\u0430 \u0442\u0430\u0432\u0430\u0433\u043d\u044b \u043a\u043e\u043c - 88\u0448\u0438\u0440\u0445\u044d\u0433\u0442\u044d\u0439 \u042d\u043a\u043e \u043c\u0430\u0442\u0435\u0440\u0438\u0430\u043b\u0442\u0430\u0439, \u04ae\u0440 \u0442\u0430\u0440\u0438\u0430\u043d\u044b \u0445\u0430\u043b\u044c\u0441 \u0431\u043e\u043b\u043e\u0432\u0441\u0440\u0443\u0443\u043b\u0436 \u0445\u0438\u0439\u0441\u044d\u043d , \u0417\u0443\u0437\u0430\u0430\u043d, \u04e9\u043d\u0433\u04e9\u043b\u04e9\u0433, \u0433\u044d\u0440 \u0431\u04af\u043b\u0438\u0439\u043d \u0445\u044d\u0440\u044d\u0433\u0446\u044d\u044d\u043d\u0434 \u0431\u04af\u0440\u044d\u043d \u043d\u0438\u0439\u0446\u0441\u044d","cat1":"\u0413\u0430\u043b \u0442\u043e\u0433\u043e\u043e\u043d\u044b \u0445\u044d\u0440\u044d\u0433\u0441\u044d\u043b","cat2":"\u0410\u044f\u0433\u0430, \u0442\u0430\u0432\u0430\u0433\u043d\u044b \u043a\u043e\u043c","plan_rev":1554108,"plan_qty":40,"plan_cost":636960,"price":39000.0,"cost":15924.0},"161774":{"name":"\u0417\u04e9\u04e9\u0432\u0440\u0438\u0439\u043d \u044d\u0432\u0445\u0434\u044d\u0433 \u0443\u0441\u043d\u044b \u0441\u0430\u0432, 10\u043b ","cat1":"\u0413\u0430\u043b \u0442\u043e\u0433\u043e\u043e\u043d\u044b \u0445\u044d\u0440\u044d\u0433\u0441\u044d\u043b","cat2":"\u0423\u0441\u043d\u044b \u0441\u0430\u0432","plan_rev":199245,"plan_qty":20,"plan_cost":141000,"price":10000.0,"cost":7050.0},"162166":{"name":"4 \u0442\u0430\u043b\u0442 \u0430\u0441\u0430\u0440 \u0441\u04af\u04af\u0434\u0440\u044d\u0432\u0447 Emoko-F, \u0414\u044d\u043b\u0433\u044d\u0436 \u0445\u0443\u0440\u0430\u0430\u0445\u0430\u0434 \u0445\u044f\u043b\u0431\u0430\u0440\u0445\u0430\u043d\t","cat1":"\u0421\u04af\u04af\u0434\u0440\u044d\u0432\u0447","cat2":"4 \u0445\u04e9\u043b\u0442\u044d\u0439 \u0442\u043e\u043c","plan_rev":4961189,"plan_qty":20,"plan_cost":3412500,"price":249000.0,"cost":170625.0},"162884":{"name":"\u044f\u043b\u0430\u0430 \u0448\u0443\u043c\u0443\u0443\u043b \u04af\u0440\u0433\u044d\u044d\u0433\u0447 \u0448\u0438\u043d\u044d \u0442\u04e9\u0440\u04e9","cat1":"\u0411\u0443\u0441\u0430\u0434","cat2":"\u042f\u043b\u0430\u0430, \u0448\u0443\u043c\u0443\u0443\u043b \u04af\u0440\u0433\u044d\u044d\u0433\u0447","plan_rev":1638786,"plan_qty":47,"plan_cost":683850,"price":35000.0,"cost":14550.0},"500025":{"name":"Travel Gas Stove-\u0410\u044f\u043d\u044b \u0413\u0430\u0437\u0430\u043d \u041f\u043b","cat1":"\u0413\u0430\u043b \u0442\u043e\u0433\u043e\u043e\u043d\u044b \u0445\u044d\u0440\u044d\u0433\u0441\u044d\u043b","cat2":"\u0413\u0430\u0437\u044b\u043d \u043f\u043b\u0438\u0442\u043a\u0430","plan_rev":2092068,"plan_qty":60,"plan_cost":1181280,"price":35000.0,"cost":19688.0},"500037":{"name":"\u0427\u0438\u0439\u0433\u043d\u0438\u0439 \u0417\u0443\u0437\u0430\u0430\u043d \u0433\u0443\u0434\u0430\u0441","cat1":"\u0427\u0438\u0439\u0433\u043d\u0438\u0439 \u0433\u0443\u0434\u0430\u0441","cat2":"\u0417\u0443\u0437\u0430\u0430\u043d","plan_rev":2540368,"plan_qty":30,"plan_cost":1601010,"price":85000.0,"cost":53367.0},"500041":{"name":"\u0410\u044f\u043d\u044b \u04af\u04af\u0440\u0433\u044d\u0432\u0447\u0442\u044d\u0439 \u043a\u043e\u043c","cat1":"\u0413\u0430\u043b \u0442\u043e\u0433\u043e\u043e\u043d\u044b \u0445\u044d\u0440\u044d\u0433\u0441\u044d\u043b","cat2":"\u0410\u044f\u0433\u0430, \u0442\u0430\u0432\u0430\u0433\u043d\u044b \u043a\u043e\u043c","plan_rev":3148064,"plan_qty":40,"plan_cost":2247000,"price":79000.0,"cost":56175.0},"50004201":{"name":"4 \u0421\u0430\u043d\u0434\u0430\u043b\u0442\u0430\u0439 \u0426\u04af\u043d\u0445\u0442\u044d\u0439 \u042d\u0432\u0445\u044d\u0433\u0434\u0434\u044d\u0433 tom","cat1":"\u0428\u0438\u0440\u044d\u044d, \u0441\u0430\u043d\u0434\u0430\u043b\u043d\u044b \u043a\u043e\u043c","cat2":"nan","plan_rev":7770538,"plan_qty":40,"plan_cost":6111000,"price":195000.0,"cost":152775.0},"500045":{"name":"\u0428\u043e\u0440\u043b\u043e\u0433\u043d\u044b \u0448\u043e\u0440 6 \u0448-\u0442\u044d\u0439 \u0442\u043e\u043c","cat1":"\u0413\u0430\u043b \u0442\u043e\u0433\u043e\u043e\u043d\u044b \u0445\u044d\u0440\u044d\u0433\u0441\u044d\u043b","cat2":"\u0428\u043e\u0440\u043b\u043e\u0433\u043d\u044b \u0448\u043e\u0440","plan_rev":1195467,"plan_qty":100,"plan_cost":472500,"price":12000.0,"cost":4725.0},"500650":{"name":"4 \u0445\u04af\u043d\u0438\u0439 4 \u0441\u0430\u043d\u0434\u0430\u043b\u0442\u0430\u0439 \u042d\u0432\u0445\u044d\u0433\u0434\u0434\u044d\u0433","cat1":"\u0428\u0438\u0440\u044d\u044d, \u0441\u0430\u043d\u0434\u0430\u043b\u043d\u044b \u043a\u043e\u043c","cat2":"nan","plan_rev":3546553,"plan_qty":40,"plan_cost":2226000,"price":89000.0,"cost":55650.0},"500692":{"name":"\u0410\u044f\u043d\u044b \u0426\u04af\u043d\u0445\u0442\u044d\u0439 \u0421\u04af\u04af\u0434\u0440\u044d\u0432\u0447","cat1":"\u0421\u04af\u04af\u0434\u0440\u044d\u0432\u0447","cat2":"4 \u0445\u04e9\u043b\u0442\u044d\u0439 \u0442\u043e\u043c","plan_rev":11705617,"plan_qty":50,"plan_cost":8137500,"price":235000.0,"cost":162750.0},"500743":{"name":"\u0410\u044f\u043d\u044b \u0428\u04af\u0440\u0448\u04af\u04af\u0440 - Camp Shower","cat1":"\u0428\u04af\u0440\u0448\u04af\u04af\u0440","cat2":"\u041c\u043e\u0442\u043e\u0440\u0433\u04af\u0439","plan_rev":5977337,"plan_qty":301,"plan_cost":2386328,"price":20000.0,"cost":7928.0},"500762":{"name":"Jack Wolfskin \u0410\u044f\u043d\u044b \u0421\u0430\u043d\u0434\u0430\u043b","cat1":"\u0421\u0430\u043d\u0434\u0430\u043b","cat2":"\u0416\u0438\u0436\u0438\u0433","plan_rev":2490557,"plan_qty":100,"plan_cost":1522500,"price":25000.0,"cost":15225.0},"500764":{"name":"\u0427\u0438\u0439\u0433\u043d\u0438\u0439 \u0413\u0443\u0434\u0430\u0441 - 180\u0445200\u0441\u043c","cat1":"\u0427\u0438\u0439\u0433\u043d\u0438\u0439 \u0433\u0443\u0434\u0430\u0441","cat2":"\u041d\u0438\u043c\u0433\u044d\u043d","plan_rev":1245278,"plan_qty":50,"plan_cost":761250,"price":25000.0,"cost":15225.0},"50127502":{"name":"\u0421\u0430\u0439\u043d \u0448\u0438\u0440\u044d\u044d \u0448\u0438\u043d\u044d_139k","cat1":"\u0428\u0438\u0440\u044d\u044d","cat2":"\u0414\u0430\u0430\u0446\u044b\u043d","plan_rev":3461874,"plan_qty":25,"plan_cost":2283750,"price":139000.0,"cost":91350.0},"50127501":{"name":"\u0421\u0430\u0439\u043d \u0448\u0438\u0440\u044d\u044d \u0448\u0438\u043d\u044d_2  109k","cat1":"\u0428\u0438\u0440\u044d\u044d","cat2":"\u0414\u0430\u0430\u0446\u044b\u043d","plan_rev":3800590,"plan_qty":35,"plan_cost":2462250,"price":109000.0,"cost":70350.0},"501286":{"name":"Tat - 001 4 \u0445\u04af\u043d\u0438\u0439 \u043c\u0430\u0439\u0445\u0430\u043d","cat1":"\u041c\u0430\u0439\u0445\u0430\u043d","cat2":"\u0423\u0433\u0441\u0430\u0440\u0447 \u0431\u0430\u0440\u044c\u0434\u0430\u0433","plan_rev":4473040,"plan_qty":10,"plan_cost":2709000,"price":449000.0,"cost":270900.0},"501296":{"name":"\u0428\u043e\u0440\u043b\u043e\u0433\u043d\u044b \u043a\u043e\u043c Desktop style","cat1":"\u0413\u0430\u043b \u0442\u043e\u0433\u043e\u043e\u043d\u044b \u0445\u044d\u0440\u044d\u0433\u0441\u044d\u043b","cat2":"\u0428\u043e\u0440\u043b\u043e\u0433\u043d\u044b \u0437\u0443\u0443\u0445","plan_rev":1952597,"plan_qty":40,"plan_cost":1134000,"price":49000.0,"cost":28350.0},"501311":{"name":"Intex 2 \u0445\u04af\u043d\u0438\u0439 \u0433\u0443\u0434\u0430\u0441 25\u0441\u043c","cat1":"\u0425\u0438\u0439\u043b\u0434\u044d\u0433 \u0433\u0443\u0434\u0430\u0441","cat2":"\u0413\u0430\u0440\u0430\u0430\u0440 \u0445\u0438\u0439\u043b\u0434\u044d\u0433","plan_rev":17732765,"plan_qty":201,"plan_cost":10552500,"price":89000.0,"cost":52500.0},"501312":{"name":"Best way 2\u0445\u04af\u043d \u0433\u0443\u0434\u0430\u0441 Pavillo","cat1":"\u0425\u0438\u0439\u043b\u0434\u044d\u0433 \u0433\u0443\u0434\u0430\u0441","cat2":"\u0413\u0430\u0440\u0430\u0430\u0440 \u0445\u0438\u0439\u043b\u0434\u044d\u0433","plan_rev":24825871,"plan_qty":281,"plan_cost":13719825,"price":89000.0,"cost":48825.0},"501328":{"name":"\u0428\u0438\u0434\u0434\u044d\u0433 \u043c\u0430\u0439\u0445\u0430\u043d - travel top","cat1":"\u041c\u0430\u0439\u0445\u0430\u043d","cat2":"\u0428\u0438\u0434\u0434\u044d\u0433","plan_rev":3964967,"plan_qty":20,"plan_cost":3034500,"price":199000.0,"cost":151725.0},"501789":{"name":"\u041c\u0430\u0439\u0445\u0430\u043d TRAVELTOP ART-1919","cat1":"\u041c\u0430\u0439\u0445\u0430\u043d","cat2":"\u0423\u0433\u0441\u0430\u0440\u0447 \u0431\u0430\u0440\u044c\u0434\u0430\u0433","plan_rev":7551369,"plan_qty":20,"plan_cost":4919260,"price":379000.0,"cost":245963.0},"501791":{"name":"ALpicooL \u0445\u04e9\u0440\u0433\u04af\u04af\u0440 40l","cat1":"\u0425\u04e9\u0440\u0433\u04af\u04af\u0440","cat2":"\u0425\u04e9\u0440\u0433\u04af\u04af\u0440","plan_rev":19127477,"plan_qty":40,"plan_cost":14826000,"price":480000.0,"cost":370650.0},"501792":{"name":"\u042d\u0432\u0445\u044d\u0433\u0434\u0434\u044d\u0433 \u0430\u044f\u043d\u044b \u043e\u0440 \u0442\u04af\u0448\u043b\u044d\u0433\u0433\u04af\u0439","cat1":"\u0410\u044f\u043d\u044b \u043e\u0440","cat2":"\u0421\u0442\u0430\u043d\u0434\u0430\u0440\u0442","plan_rev":3945042,"plan_qty":40,"plan_cost":2310000,"price":99000.0,"cost":57750.0},"501796":{"name":"\u041c\u0430\u0439\u0445\u0430\u043d TRAVELTOP ART-1905","cat1":"\u041c\u0430\u0439\u0445\u0430\u043d","cat2":"\u0423\u0433\u0441\u0430\u0440\u0447 \u0431\u0430\u0440\u044c\u0434\u0430\u0433","plan_rev":2938857,"plan_qty":10,"plan_cost":1895250,"price":295000.0,"cost":189525.0},"501804":{"name":"\u0410\u044f\u043d\u044b \u0441\u0430\u043d\u0434\u0430\u043b \u0441\u04af\u04af\u0434\u0440\u044d\u0432\u0447\u0442\u044d\u0439","cat1":"\u0421\u0430\u043d\u0434\u0430\u043b","cat2":"\u0414\u0430\u0430\u0446\u044b\u043d","plan_rev":2127932,"plan_qty":24,"plan_cost":1234800,"price":89000.0,"cost":51450.0},"501814":{"name":"\u0410\u044f\u043d\u044b \u0441\u0430\u043d\u0434\u0430\u043b CampMaster","cat1":"\u0421\u0430\u043d\u0434\u0430\u043b","cat2":"\u0414\u0430\u0430\u0446\u044b\u043d","plan_rev":8467893,"plan_qty":100,"plan_cost":4357500,"price":85000.0,"cost":43575.0},"501815":{"name":"\u041c\u0430\u0445 \u0448\u0430\u0440\u0430\u0433\u0447 Hanori","cat1":"\u0413\u0430\u043b \u0442\u043e\u0433\u043e\u043e\u043d\u044b \u0445\u044d\u0440\u044d\u0433\u0441\u044d\u043b","cat2":"\u041c\u0430\u0445 \u0448\u0430\u0440\u0430\u0433\u0447","plan_rev":1344901,"plan_qty":30,"plan_cost":803250,"price":45000.0,"cost":26775.0},"501817":{"name":"\u041c\u0430\u0439\u0445\u0430\u043d Travel Top 1908","cat1":"\u041c\u0430\u0439\u0445\u0430\u043d","cat2":"\u0423\u0433\u0441\u0430\u0440\u0447 \u0431\u0430\u0440\u044c\u0434\u0430\u0433","plan_rev":3362252,"plan_qty":15,"plan_cost":1748250,"price":225000.0,"cost":116550.0},"501854":{"name":"E-COOK 1 \u0443\u0434\u0430\u0430\u0433\u0438\u0439\u043d \u043a\u043e\u043c","cat1":"\u0413\u0430\u043b \u0442\u043e\u0433\u043e\u043e\u043d\u044b \u0445\u044d\u0440\u044d\u0433\u0441\u044d\u043b","cat2":"\u0410\u044f\u0433\u0430, \u0442\u0430\u0432\u0430\u0433\u043d\u044b \u043a\u043e\u043c","plan_rev":1165581,"plan_qty":30,"plan_cost":819000,"price":39000.0,"cost":27300.0},"503697":{"name":"3 \u0445\u04af\u043d\u0438\u0439 \u0430\u044f\u043d\u044b \u043c\u0430\u0439\u0445\u0430\u043d /\u0441\u04af\u04af\u0434\u0440\u044d\u0432\u0447","cat1":"\u041c\u0430\u0439\u0445\u0430\u043d","cat2":"\u0410\u0432\u0442\u043e\u043c\u0430\u0442","plan_rev":2889046,"plan_qty":20,"plan_cost":1627500,"price":145000.0,"cost":81375.0},"503778":{"name":"\u0421\u0443\u0443\u0440\u044c\u0442\u0430\u0439 \u0433\u044d\u0440\u044d\u043b\u0442\u04af\u04af\u043b\u044d\u0433","cat1":"\u0413\u044d\u0440\u044d\u043b","cat2":"nan","plan_rev":14186212,"plan_qty":160,"plan_cost":7812000,"price":89000.0,"cost":48825.0},"107091":{"name":"Crown shades deer oor sudrevch oruulav","cat1":"\u0421\u04af\u04af\u0434\u0440\u044d\u0432\u0447","cat2":"4 \u0445\u04e9\u043b\u0442\u044d\u0439 \u0442\u043e\u043c","plan_rev":17932010,"plan_qty":100,"plan_cost":10237500,"price":180000.0,"cost":102375.0},"191454":{"name":"Nomad lite 6","cat1":"\u041c\u0430\u0439\u0445\u0430\u043d","cat2":"\u0445\u0438\u0439\u043b\u0434\u044d\u0433 \u043c\u0430\u0439\u0445\u0430\u043d","plan_rev":162882422,"plan_qty":301,"plan_cost":94735988,"price":545000.0,"cost":314737.5},"800002":{"name":"Nomad Pro 12","cat1":"\u041c\u0430\u0439\u0445\u0430\u043d","cat2":"\u0445\u0438\u0439\u043b\u0434\u044d\u0433 \u043c\u0430\u0439\u0445\u0430\u043d","plan_rev":31351130,"plan_qty":30,"plan_cost":19144125,"price":1049000.0,"cost":638137.5},"800003":{"name":"Nomad Pro 6","cat1":"\u041c\u0430\u0439\u0445\u0430\u043d","cat2":"\u0445\u0438\u0439\u043b\u0434\u044d\u0433 \u043c\u0430\u0439\u0445\u0430\u043d","plan_rev":207712446,"plan_qty":301,"plan_cost":113857012,"price":695000.0,"cost":378262.5},"800004":{"name":"Nomad Pro 6 Shade","cat1":"\u041c\u0430\u0439\u0445\u0430\u043d","cat2":"\u0445\u0438\u0439\u043b\u0434\u044d\u0433 \u043c\u0430\u0439\u0445\u0430\u043d","plan_rev":79199710,"plan_qty":100,"plan_cost":45622500,"price":795000.0,"cost":456225.0},"100002":{"name":"\u0441\u044d\u043d\u0441\u0442\u044d\u0439 \u043c\u0430\u0439\u0445\u0430\u043d\u044b \u0433\u044d\u0440\u044d\u043b","cat1":"\u0413\u044d\u0440\u044d\u043b","cat2":"nan","plan_rev":777054,"plan_qty":20,"plan_cost":400000,"price":39000.0,"cost":20000.0},"100003":{"name":"\u0447\u0438\u0439\u0433\u043d\u0438\u0439 \u0433\u0443\u0434\u0430\u0441","cat1":"\u0427\u0438\u0439\u0433\u043d\u0438\u0439 \u0433\u0443\u0434\u0430\u0441","cat2":"\u041d\u0438\u043c\u0433\u044d\u043d","plan_rev":1046034,"plan_qty":30,"plan_cost":518175,"price":35000.0,"cost":17272.5},"100004":{"name":"\u0433\u0430\u0437\u0430\u043d \u043f\u043b\u0438\u0442\u043a\u0430 \u0445\u0443\u0443\u0447\u0438\u043d\u0442\u0430\u0439 \u0438\u0436\u0438\u043b \u0445\u044f\u043c\u0434\u0445\u0430\u043d 4000w","cat1":"\u0413\u0430\u043b \u0442\u043e\u0433\u043e\u043e\u043d\u044b \u0445\u044d\u0440\u044d\u0433\u0441\u044d\u043b","cat2":"\u0413\u0430\u0437\u044b\u043d \u043f\u043b\u0438\u0442\u043a\u0430","plan_rev":2749575,"plan_qty":40,"plan_cost":1239000,"price":69000.0,"cost":30975.0},"100005":{"name":"\u0430\u044f\u043d\u044b \u0433\u044d\u0440\u044d\u043b \u0445\u044f\u043c\u0445\u04e9\u04e9\u043d 100w","cat1":"\u0413\u044d\u0440\u044d\u043b","cat2":"nan","plan_rev":1494334,"plan_qty":60,"plan_cost":340200,"price":25000.0,"cost":5670.0},"10000601":{"name":"\u0410\u044f\u043d\u044b \u0445\u044f\u043c\u0434 \u0441\u04af\u04af\u0434\u0440\u044d\u0432\u0447","cat1":"\u0421\u04af\u04af\u0434\u0440\u044d\u0432\u0447","cat2":"2 \u0445\u04e9\u043b\u0442\u044d\u0439 \u043e\u0432\u043e\u0440 \u0436\u0438\u0436\u0438\u0433","plan_rev":1773277,"plan_qty":20,"plan_cost":766500,"price":89000.0,"cost":38325.0},"10000602":{"name":"\u0410\u044f\u043d\u044b \u0445\u044f\u043c\u0434 \u0441\u04af\u04af\u0434\u0440\u044d\u0432\u0447","cat1":"\u0421\u04af\u04af\u0434\u0440\u044d\u0432\u0447","cat2":"2 \u0445\u04e9\u043b\u0442\u044d\u0439 \u043e\u0432\u043e\u0440 \u0436\u0438\u0436\u0438\u0433","plan_rev":3785647,"plan_qty":40,"plan_cost":2121000,"price":95000.0,"cost":53025.0},"100007":{"name":"\u043c\u043e\u0434\u043e\u043d 4 \u0441\u0430\u043d\u0434\u0430\u043b\u0442\u0430\u0439 \u0448\u0438\u0440\u044d\u044d","cat1":"\u0421\u0430\u043d\u0434\u0430\u043b, \u0448\u0438\u0440\u044d\u044d\u043d\u0438\u0439 \u043a\u043e\u043c","cat2":"nan","plan_rev":6575070,"plan_qty":30,"plan_cost":3858750,"price":220000.0,"cost":128625.0},"193119":{"name":"\u0421\u04af\u04af\u0434\u0440\u044d\u0432\u0447\u0442\u0430\u0439 \u0445\u0438\u0439\u043b\u0434\u044d\u0433 \u043c\u0430\u0439\u0445\u0430\u043d","cat1":"\u041c\u0430\u0439\u0445\u0430\u043d","cat2":"\u0445\u0438\u0439\u043b\u0434\u044d\u0433 \u043c\u0430\u0439\u0445\u0430\u043d","plan_rev":17483709,"plan_qty":30,"plan_cost":11081670,"price":585000.0,"cost":369389.0},"193120":{"name":"\u0425\u0438\u0439\u043b\u0434\u044d\u0433 \u0437\u0443\u0437\u0430\u0430\u043d \u0441\u0430\u0439\u043d \u043c\u0430\u0439\u0445\u0430\u043d","cat1":"\u041c\u0430\u0439\u0445\u0430\u043d","cat2":"\u0445\u0438\u0439\u043b\u0434\u044d\u0433 \u043c\u0430\u0439\u0445\u0430\u043d","plan_rev":17832387,"plan_qty":20,"plan_cost":10290000,"price":895000.0,"cost":514500.0},"100008":{"name":"\u0410\u044f\u043d\u044b \u0433\u044d\u0440\u044d\u043b 3 \u0441\u0430\u043b\u0434\u0430\u0433\u0438\u0439\u043d \u0441\u0430\u0439\u043d \u043d\u044c 6 \u0441\u0430\u043b\u0434\u0430\u0433","cat1":"\u0413\u044d\u0440\u044d\u043b","cat2":"nan","plan_rev":896600,"plan_qty":20,"plan_cost":427560,"price":45000.0,"cost":21378.0},"193113":{"name":"10 \u0441\u043c \u0437\u0443\u0437\u0430\u0430\u043d, 2 \u0445\u04af\u043d\u0438\u0439 \u04e9\u04e9\u0440\u04e9\u04e9 \u0445\u0438\u0439\u043b\u044d\u0433\u0434\u0434\u044d\u0433 \u0433\u0443\u0434\u0430\u0441, Qomotop,","cat1":"\u0425\u0438\u0439\u043b\u0434\u044d\u0433 \u0433\u0443\u0434\u0430\u0441","cat2":"\u04e8\u04e9\u0440\u04e9\u04e9 \u0445\u0438\u0439\u043b\u044d\u0433\u0434\u0434\u044d\u0433","plan_rev":3959985,"plan_qty":15,"plan_cost":2334150,"price":265000.0,"cost":155610.0},"193108":{"name":"\u041e\u043b\u043e\u043d \u04af\u0439\u043b\u0434\u044d\u043b\u0442 \u0448\u043e\u0440\u043b\u043e\u0433\u044b\u043d \u0437\u0443\u0443\u0445","cat1":"\u0413\u0430\u043b \u0442\u043e\u0433\u043e\u043e\u043d\u044b \u0445\u044d\u0440\u044d\u0433\u0441\u044d\u043b","cat2":"\u0428\u043e\u0440\u043b\u043e\u0433\u043d\u044b \u0437\u0443\u0443\u0445","plan_rev":5962393,"plan_qty":15,"plan_cost":4186410,"price":399000.0,"cost":279094.0},"131069":{"name":"\u0410\u044f\u043d\u044b \u0445\u0430\u043b\u0443\u0443\u043d \u0445\u04af\u0439\u0442\u043d\u044d\u044d \u0431\u0430\u0440\u0438\u0433\u0447 \u0446\u04af\u043d\u0445, \u0425\u043e\u043e\u043b\u043d\u044b \u0446\u04af\u043d\u0445, 16 \u043b\u0438\u0442\u0440 \u0431\u0430\u0433\u0442\u0430\u0430\u043c\u0436\u0442\u0430\u0439, \u0423\u0440\u0442 \u043e\u043e\u0441\u043e\u0440","cat1":"\u0425\u04e9\u0440\u0433\u04af\u04af\u0440","cat2":"\u0425\u04af\u0439\u0442\u044d\u043d \u0431\u0430\u0440\u0438\u0433\u0447","plan_rev":227139,"plan_qty":12,"plan_cost":176280,"price":19000.0,"cost":14690.0},"193121":{"name":"emoko 1 \u0445\u04af\u043d\u0438\u0439 \u043c\u044b\u0448\u043e\u043a","cat1":"\u0410\u044f\u043d\u044b \u0445\u04e9\u043d\u0436\u0438\u043b","cat2":"1 \u0445\u04af\u043d\u0438\u0439","plan_rev":547923,"plan_qty":10,"plan_cost":304500,"price":55000.0,"cost":30450.0}},"total_target":1540000000,"total_qty_target":10878};</script>
 </body>
 </html>
