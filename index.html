@@ -385,7 +385,7 @@ td[data-name]:hover::after {
 <div id="t-actual" class="tab">
   <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap">
     <div style="font-size:12px;color:var(--mut2);font-weight:500">📅 Хугацаа:</div>
-    <button class="fb active" id="act-range-all" onclick="setActualRange('all',this)">Нийт (5/20–өнөөдөр)</button>
+    <button class="fb active" id="act-range-all" onclick="setActualRange('all',this)">Нийт (5/1–өнөөдөр)</button>
     <button class="fb" id="act-range-m5" onclick="setActualRange('m5',this)">5-р сар</button>
     <button class="fb" id="act-range-m6" onclick="setActualRange('m6',this)">6-р сар</button>
     <button class="fb" id="act-range-m7" onclick="setActualRange('m7',this)">7-р сар</button>
@@ -429,8 +429,8 @@ td[data-name]:hover::after {
       <div style="height:220px"><canvas id="c-actual-cum"></canvas></div>
     </div>
   </div>
-  <div class="fbar" style="margin-bottom:10px">
-    <input class="srch" id="act-srch" placeholder="🔍 Бараа хайх (нэр/код)..." oninput="renderActualTbl()" style="width:240px">
+  <div class="fbar" style="margin-bottom:10px;flex-wrap:wrap;gap:8px">
+    <input class="srch" id="act-srch" placeholder="🔍 Бараа хайх (нэр/код)..." oninput="renderActualTbl()" style="width:200px">
     <div id="act-cat-f" style="display:flex;gap:5px;flex-wrap:wrap"></div>
     <select class="sel" id="act-srt" onchange="renderActualTbl()">
       <option value="rev">Орлогоор</option>
@@ -439,8 +439,18 @@ td[data-name]:hover::after {
       <option value="roas">ROAS-аар</option>
       <option value="pct_rev">Биелэлт%-аар</option>
     </select>
+    <select class="sel" id="act-tbl-month" onchange="renderActualTbl()" title="Барааны жагсаалтыг сараар шүүх">
+      <option value="all">📅 Бүх сар</option>
+      <option value="5">5-р сар</option>
+      <option value="6">6-р сар</option>
+      <option value="7">7-р сар</option>
+      <option value="8">8-р сар</option>
+    </select>
     <label style="font-size:11px;color:var(--mut2);display:flex;align-items:center;gap:4px">
       <input type="checkbox" id="act-diff-only" onchange="renderActualTbl()"> Зөрүүтэй л
+    </label>
+    <label style="font-size:11px;color:var(--mut2);display:flex;align-items:center;gap:4px">
+      <input type="checkbox" id="act-zero-show" onchange="renderActualTbl()" checked> 0 борлуулалт харуулах
     </label>
   </div>
   <div class="card">
@@ -2017,7 +2027,7 @@ function setActualRange(type,btn){
   const toEl=document.getElementById('act-to');
   ['all','m5','m6','m7','m8'].forEach(k=>{const b=document.getElementById('act-range-'+k);if(b)b.classList.remove('active');});
   if(btn) btn.classList.add('active');
-  if(type==='all'){fromEl.value='2026-05-20';toEl.value=today;}
+  if(type==='all'){fromEl.value='2026-05-01';toEl.value=today;}
   else if(type==='m5'){fromEl.value='2026-05-20';toEl.value='2026-05-31';}
   else if(type==='m6'){fromEl.value='2026-06-01';toEl.value='2026-06-30';}
   else if(type==='m7'){fromEl.value='2026-07-01';toEl.value='2026-07-31';}
@@ -2138,17 +2148,56 @@ function renderActualTbl(){
   const srt=document.getElementById('act-srt')?.value||'rev';
   const diffOnly=document.getElementById('act-diff-only')?.checked;
   const FS='style="position:sticky;bottom:0;background:var(--sur2);border-top:2px solid var(--brd);font-weight:700"';
-  let rows=(ACTUAL2026.by_code||[]).filter(b=>{
-    if(ACTUAL_CAT!=='all'&&b.cat1!==ACTUAL_CAT) return false;
-    if(srch&&!b.name.toLowerCase().includes(srch)&&!b.code.includes(srch)) return false;
-    return true;
-  }).map(b=>{
-    const pp=(pd?.prod_plan||{})[b.code]||{plan_rev:0,plan_qty:0};
+
+  // Борлуулалт байгаа барааны map
+  const actualMap={};
+  (ACTUAL2026.by_code||[]).forEach(b=>{ actualMap[b.code]=b; });
+
+  // Прогноз дотор байгаа бүх бараа + бодит нэмэх (0 орно)
+  const allCodes=new Set([
+    ...Object.keys(actualMap),
+    ...Object.keys(pd?.prod_plan||{})
+  ]);
+  const HIST_MAP={};
+  (HIST||[]).forEach(h=>{ HIST_MAP[h.code]=h; });
+
+  let rows=[...allCodes].map(code=>{
+    const b=actualMap[code]||{code,name:'',cat1:'',cat2:'',rev:0,qty:0,profit:0,ads:0,cost:0,ret_qty:0,gross_qty:0,profit_pct:0,ads_pct:0,ret_pct:0,roas:0,avg_price:0};
+    // HIST-аас нэр, ангилал авна
+    if(!b.name && HIST_MAP[code]) { b.name=HIST_MAP[code].name||''; b.cat1=HIST_MAP[code].cat1||''; b.cat2=HIST_MAP[code].cat2||''; }
+    if(!b.name && pd?.prod_plan?.[code]) { b.name=pd.prod_plan[code].name||''; b.cat1=pd.prod_plan[code].cat1||''; }
+    const pp=(pd?.prod_plan||{})[code]||{plan_rev:0,plan_qty:0};
     const pct_rev=pp.plan_rev>0?Math.round(b.rev/pp.plan_rev*1000)/10:null;
     const diff_rev=pp.plan_rev>0?b.rev-pp.plan_rev:null;
     return {...b,plan_rev:pp.plan_rev,plan_qty:pp.plan_qty,pct_rev,diff_rev};
+  }).filter(b=>{
+    if(ACTUAL_CAT!=='all'&&b.cat1!==ACTUAL_CAT) return false;
+    if(srch&&!(b.name||'').toLowerCase().includes(srch)&&!(b.code||'').includes(srch)) return false;
+    return true;
   });
   if(diffOnly) rows=rows.filter(b=>b.pct_rev!=null&&Math.abs(100-(b.pct_rev||0))>15);
+  const showZero=document.getElementById('act-zero-show')?.checked!==false;
+  if(!showZero) rows=rows.filter(b=>b.rev>0);
+  // Сарын filter — тухайн сарын бодит тоо тооцоолно
+  const tblMonth=document.getElementById('act-tbl-month')?.value||'all';
+  if(tblMonth!=='all'){
+    const m=parseInt(tblMonth);
+    rows=rows.map(b=>{
+      const dayData=ACTUAL2026.daily||{};
+      let mRev=0,mQty=0,mPrf=0,mAds=0;
+      Object.entries(dayData).forEach(([ds,v])=>{
+        if(parseInt(ds.slice(5,7))===m){ mRev+=v.rev||0;mQty+=v.qty||0;mPrf+=v.profit||0;mAds+=v.ads||0; }
+      });
+      // by_code-оос кодоор шүүх боломжгүй тул нийт ratio ашиглана
+      const totRev=(ACTUAL2026.summary?.rev||1);
+      const ratio=totRev>0?(b.rev/totRev):0;
+      return {...b,
+        rev:Math.round(mRev*ratio),qty:Math.round(mQty*ratio),
+        profit:Math.round(mPrf*ratio),ads:Math.round(mAds*ratio),
+        profit_pct:mRev>0?Math.round(mPrf*ratio/(mRev*ratio||1)*1000)/10:0,
+      };
+    });
+  }
   rows.sort((a,b2)=>{
     if(srt==='rev') return b2.rev-a.rev;if(srt==='qty') return b2.qty-a.qty;
     if(srt==='profit_pct') return b2.profit_pct-a.profit_pct;if(srt==='roas') return b2.roas-a.roas;
@@ -2194,7 +2243,7 @@ init();
   const today=new Date().toISOString().split('T')[0];
   const f=document.getElementById('act-from');
   const t=document.getElementById('act-to');
-  if(f) f.value='2026-05-20';
+  if(f) f.value='2026-05-01';
   if(t) t.value=today;
 })();
 
