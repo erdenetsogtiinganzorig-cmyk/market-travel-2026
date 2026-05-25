@@ -772,7 +772,7 @@ function renderPlan() {
   const allCats = [...new Set(data.map(r=>r.cat1))].sort();
   const cf = document.getElementById('plan-cat-f');
   if (!cf.children.length) {
-    cf.innerHTML = '<button class="fb active" onclick="setPlanCat('all',this)">Бүгд</button>' +
+    cf.innerHTML = '<button class="fb active" onclick="setPlanCat(&apos;all&apos;,this)">Бүгд</button>' +
       allCats.map(c=>`<button class="fb" onclick="setPlanCat('${c.replace(/'/g,"\'")}',this)">${c}</button>`).join('');
   }
 
@@ -1129,7 +1129,7 @@ function renderActual() {
   const cats = [...new Set((ACTUAL2026.by_code||[]).map(b=>b.cat1))].filter(Boolean).sort();
   const cf = document.getElementById('act-cat-f');
   if(cf && !cf.children.length) {
-    cf.innerHTML = '<button class="fb active" onclick="setActualCat('all',this)">Бүгд</button>' +
+    cf.innerHTML = '<button class="fb active" onclick="setActualCat(&apos;all&apos;,this)">Бүгд</button>' +
       cats.map(c=>`<button class="fb" onclick="setActualCat('${c.replace(/'/g,"\'")}',this)">${c}</button>`).join('');
   }
 
