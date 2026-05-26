@@ -2028,7 +2028,7 @@ function setActualRange(type,btn){
   ['all','m5','m6','m7','m8'].forEach(k=>{const b=document.getElementById('act-range-'+k);if(b)b.classList.remove('active');});
   if(btn) btn.classList.add('active');
   if(type==='all'){fromEl.value='2026-05-01';toEl.value=today;}
-  else if(type==='m5'){fromEl.value='2026-05-20';toEl.value='2026-05-31';}
+  else if(type==='m5'){fromEl.value='2026-05-01';toEl.value='2026-05-31';}
   else if(type==='m6'){fromEl.value='2026-06-01';toEl.value='2026-06-30';}
   else if(type==='m7'){fromEl.value='2026-07-01';toEl.value='2026-07-31';}
   else if(type==='m8'){fromEl.value='2026-08-01';toEl.value='2026-08-31';}
@@ -2118,13 +2118,20 @@ function renderActual(){
     const all_dates=[];let d=new Date(chartFrom);const end=new Date(to);
     while(d<=end){all_dates.push(d.toISOString().split('T')[0]);d.setDate(d.getDate()+1);}
     const act_d=all_dates.map(ds=>daily_f[ds]?daily_f[ds].rev:0);
-    const plan_d=all_dates.map(ds=>(pd.daily_plan||{})[ds]||0);
+    // Прогноз зөвхөн daily_plan дата байгаа өдрүүдэд харагдана
+    const firstPlanDate=Object.keys(pd.daily_plan||{}).sort()[0]||'2026-05-20';
+    const plan_d=all_dates.map(ds=>ds<firstPlanDate?null:((pd.daily_plan||{})[ds]||0));
     bC('c-actual-daily',all_dates.map(d=>d.slice(5)),[
       {label:'Бодит',data:act_d,backgroundColor:'#10b98166',borderColor:'#10b981',borderWidth:2,borderRadius:3,type:'bar'},
-      {label:'Прогноз',data:plan_d,borderColor:'#f59e0b',backgroundColor:'transparent',borderWidth:1.5,type:'line',tension:0.3,pointRadius:0},
+      {label:'Прогноз',data:plan_d,borderColor:'#f59e0b',backgroundColor:'transparent',borderWidth:1.5,type:'line',tension:0.3,pointRadius:0,spanGaps:false},
     ]);
     let ca=0,cp=0;const cum_a=[],cum_p=[];
-    all_dates.forEach(ds=>{ca+=daily_f[ds]?daily_f[ds].rev:0;cp+=(pd.daily_plan||{})[ds]||0;cum_a.push(ca);cum_p.push(cp);});
+    all_dates.forEach(ds=>{
+      ca+=daily_f[ds]?daily_f[ds].rev:0;
+      cp+=ds<firstPlanDate?0:((pd.daily_plan||{})[ds]||0);
+      cum_a.push(ca);
+      cum_p.push(ds<firstPlanDate?null:cp);
+    });
     bC('c-actual-cum',all_dates.map(d=>d.slice(5)),[
       {label:'Бодит',data:cum_a,borderColor:'#10b981',backgroundColor:'#10b98122',borderWidth:2,fill:true,tension:0.3,pointRadius:0},
       {label:'Прогноз',data:cum_p,borderColor:'#f59e0b',backgroundColor:'transparent',borderWidth:1.5,tension:0.3,pointRadius:0},
