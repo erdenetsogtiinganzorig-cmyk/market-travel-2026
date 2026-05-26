@@ -2092,7 +2092,9 @@ function renderActual(){
   document.getElementById('act-bar-plan').style.width=Math.min(plan.rev/TARGET_REV*100,100)+'%';
   document.getElementById('act-bar-label-left').textContent='Бодит: '+fmt(agg.rev);
   document.getElementById('act-bar-label-plan').textContent='Төлөвлөгөө ('+from.slice(5)+'-'+to.slice(5)+'): '+fmt(plan.rev);
-  document.getElementById('act-target-info').innerHTML=`${from.slice(5)}–${to.slice(5)}: Төлөвлөгөөний <b>${pct_plan}%</b> <span style="color:${diff_rev>=0?'#34d399':'#f87171'}">(${diff_rev>=0?'+':''}${fmt(diff_rev)})</span>`;
+  const firstReal=Object.keys(daily_f).sort()[0];
+  const dataNote=firstReal&&firstReal>from?` (бодит дата ${firstReal.slice(5)}-с)`:'';
+  document.getElementById('act-target-info').innerHTML=`${from.slice(5)}–${to.slice(5)}${dataNote}: Төлөвлөгөөний <b>${pct_plan}%</b> <span style="color:${diff_rev>=0?'#34d399':'#f87171'}">(${diff_rev>=0?'+':''}${fmt(diff_rev)})</span>`;
   // KPI
   const kpis=[
     {lbl:'Нийт орлого',val:fmt(agg.rev),sub:fmt(plan.rev)+' төлөвлөгөө',pct:plan.rev>0?Math.round(agg.rev/plan.rev*100):0,diff:diff_rev,cls:'g'},
@@ -2109,7 +2111,11 @@ function renderActual(){
   }).join('');
   // Графикууд
   setTimeout(()=>{
-    const all_dates=[];let d=new Date(from);const end=new Date(to);
+    // График-т зөвхөн бодит дата эхэлсэн өдрөөс харуулна
+    // (KPI нь from/to бүтэн хугацааг тооцдог)
+    const firstActualDate = Object.keys(daily_f).sort()[0] || from;
+    const chartFrom = firstActualDate < from ? from : firstActualDate;
+    const all_dates=[];let d=new Date(chartFrom);const end=new Date(to);
     while(d<=end){all_dates.push(d.toISOString().split('T')[0]);d.setDate(d.getDate()+1);}
     const act_d=all_dates.map(ds=>daily_f[ds]?daily_f[ds].rev:0);
     const plan_d=all_dates.map(ds=>(pd.daily_plan||{})[ds]||0);
