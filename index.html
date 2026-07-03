@@ -2336,47 +2336,75 @@ function applyHistData(data) {
 }
 </script>
 <script>
-// type=plan endpoint-аас prod_plan, daily_plan, cum_plan, total_target, total_qty_target динамикаар татах
+// type=plan — JSONP аргаар татах (бусад endpoint-тэй адил)
 (function() {
   var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwu8SnmZqS-CqDwrWmaGF12QQqZQscny-XN7mvw18KXr4RG1i_dcZFe_jv3symV3gf6/exec';
-  
-  // Хуучин __PLAN_DATA__ болон __PLAN__ структурыг хадгалах (backward compat)
-  window.__PLAN_DATA__ = { prod_plan: {}, daily_plan: {}, cum_plan: {}, total_target: 0, total_qty_target: 0 };
+  var MAX_RETRIES = 3;
+  var attempt = 0;
+
+  window.__PLAN_DATA__ = { prod_plan: {}, daily_plan: {}, cum_plan: {}, total_target: 1540000000, total_qty_target: 10878 };
   window.__PLAN__ = { qty: {}, rev: {}, prod_info: {} };
-  
-  fetch(SCRIPT_URL + '?type=plan')
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-      var pp = data.prod_plan || {};
-      
-      // prod_plan → window.__PLAN_DATA__.prod_plan
-      window.__PLAN_DATA__.prod_plan = pp;
-      window.__PLAN_DATA__.total_target = data.total_target || 1540000000;
-      window.__PLAN_DATA__.total_qty_target = data.total_qty_target || 10878;
-      
-      // prod_info → window.__PLAN__.prod_info (backward compat)
-      var prodInfo = {};
-      Object.keys(pp).forEach(function(code) {
-        var p = pp[code];
-        prodInfo[code] = {
-          name: p.name, cat1: p.cat1, cat2: p.cat2,
-          order_qty: p.order_qty, price: p.price, cost: p.cost,
-          has_stock: false, is_new: true
-        };
-      });
-      window.__PLAN__.prod_info = prodInfo;
-      
-      // Дашбоард дахин render хийх
-      if (typeof window.renderPlanTab === 'function') window.renderPlanTab();
-      if (typeof window.refreshDashboard === 'function') window.refreshDashboard();
-      
-      // планы таб байгаа бол update хийх
-      var event = new CustomEvent('planDataLoaded', { detail: data });
-      document.dispatchEvent(event);
-    })
-    .catch(function(err) {
-      console.warn('Plan data fetch failed:', err);
+
+  function applyPlanData(data) {
+    var pp = data.prod_plan || {};
+    window.__PLAN_DATA__.prod_plan = pp;
+    window.__PLAN_DATA__.total_target = data.total_target || 1540000000;
+    window.__PLAN_DATA__.total_qty_target = data.total_qty_target || 10878;
+
+    var prodInfo = {};
+    Object.keys(pp).forEach(function(code) {
+      var p = pp[code];
+      prodInfo[code] = {
+        name: p.name, cat1: p.cat1, cat2: p.cat2,
+        order_qty: p.order_qty || p.plan_qty || 0,
+        price: p.price, cost: p.cost,
+        has_stock: false, is_new: true
+      };
     });
+    window.__PLAN__.prod_info = prodInfo;
+
+    console.log('Plan дата татагдлаа:', Object.keys(pp).length, 'бараа');
+
+    if (typeof window.renderPlanTab === 'function') window.renderPlanTab();
+    if (typeof window.refreshDashboard === 'function') window.refreshDashboard();
+    document.dispatchEvent(new CustomEvent('planDataLoaded', { detail: data }));
+  }
+
+  function fetchPlanJSONP() {
+    attempt++;
+    var cbName = '_planCb' + Date.now();
+    var timer = setTimeout(function() {
+      delete window[cbName];
+      var s = document.getElementById('_planScript');
+      if (s) s.parentNode.removeChild(s);
+      if (attempt < MAX_RETRIES) {
+        console.warn('Plan JSONP timeout, retry ' + attempt);
+        setTimeout(fetchPlanJSONP, 2000);
+      } else {
+        console.error('Plan дата татаж чадсангүй (' + MAX_RETRIES + ' оролдлого)');
+      }
+    }, 30000);
+
+    window[cbName] = function(data) {
+      clearTimeout(timer);
+      delete window[cbName];
+      var s = document.getElementById('_planScript');
+      if (s) s.parentNode.removeChild(s);
+      applyPlanData(data);
+    };
+
+    var sc = document.createElement('script');
+    sc.id = '_planScript';
+    sc.src = SCRIPT_URL + '?type=plan&callback=' + cbName + '&t=' + Date.now();
+    document.head.appendChild(sc);
+  }
+
+  // Хуудас бэлэн болсны дараа татах
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', fetchPlanJSONP);
+  } else {
+    fetchPlanJSONP();
+  }
 })();
 </script>
 </body>
