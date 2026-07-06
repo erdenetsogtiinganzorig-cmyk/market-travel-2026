@@ -2348,8 +2348,39 @@ function applyHistData(data) {
   function applyPlanData(data) {
     var pp = data.prod_plan || {};
     window.__PLAN_DATA__.prod_plan = pp;
-    window.__PLAN_DATA__.total_target = data.total_target || 1540000000;
-    window.__PLAN_DATA__.total_qty_target = data.total_qty_target || 10878;
+
+    // total_target — prod_plan-аас тооцоолох
+    var total_target = data.total_target || 0;
+    var total_qty_target = data.total_qty_target || 0;
+    if (!total_target) {
+      Object.values(pp).forEach(function(p) {
+        total_target     += (p.plan_rev  || 0);
+        total_qty_target += (p.plan_qty  || p.order_qty || 0);
+      });
+    }
+    window.__PLAN_DATA__.total_target     = total_target     || 1540000000;
+    window.__PLAN_DATA__.total_qty_target = total_qty_target || 10878;
+
+    // daily_plan, cum_plan — Apps Script-аас ирэхгүй бол prod_plan-аас тооцоолно
+    var daily_plan = data.daily_plan || {};
+    var cum_plan   = data.cum_plan   || {};
+    if (!Object.keys(daily_plan).length && total_target > 0) {
+      var totalDays   = 123;
+      var dailyTarget = Math.round(total_target / totalDays);
+      var cum = 0;
+      for (var i = 0; i < totalDays; i++) {
+        var d = new Date('2026-05-01');
+        d.setDate(d.getDate() + i);
+        var ds = d.getFullYear() + '-' +
+                 String(d.getMonth()+1).padStart(2,'0') + '-' +
+                 String(d.getDate()).padStart(2,'0');
+        daily_plan[ds] = dailyTarget;
+        cum += dailyTarget;
+        cum_plan[ds]   = cum;
+      }
+    }
+    window.__PLAN_DATA__.daily_plan = daily_plan;
+    window.__PLAN_DATA__.cum_plan   = cum_plan;
 
     var prodInfo = {};
     Object.keys(pp).forEach(function(code) {
