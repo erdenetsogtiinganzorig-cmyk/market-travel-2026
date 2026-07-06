@@ -1,513 +1,2411 @@
-/**
- * Market.mn — Travel 2026 JSON API
- * JSONP дэмжигтэй
- * Sheet2: A=Код, B=Нэр, C=Ангилал1, D=Ангилал2, E=2026 зарах,
- *         F=Өртөг, G=Зарах үнэ, H=Захиалга, I=Шинэ бараа
- */
+<!DOCTYPE html>
+<html lang="mn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Market.mn — Аяны Бараа 2026</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0a0f1e;--sur:#111827;--sur2:#1a2236;--brd:rgba(255,255,255,.07);--acc:#3b82f6;--grn:#10b981;--amb:#f59e0b;--red:#ef4444;--pur:#8b5cf6;--txt:#f1f5f9;--mut:#64748b;--mut2:#94a3b8}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"DM Sans",sans-serif;background:var(--bg);color:var(--txt);font-size:14px}
+.hdr{background:linear-gradient(135deg,#0f172a,#1e1b4b 50%,#0f172a);border-bottom:1px solid var(--brd);padding:14px 28px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.hdr-l{display:flex;align-items:center;gap:10px}
+.logo{width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,#3b82f6,#8b5cf6);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:#fff}
+.hdr h1{font-size:15px;font-weight:600}
+.hdr p{font-size:11px;color:var(--mut2);margin-top:1px}
+.live{background:rgba(16,185,129,.15);border:1px solid rgba(16,185,129,.3);color:#34d399;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:500;display:flex;align-items:center;gap:6px}
+.live-dot{width:6px;height:6px;border-radius:50%;background:#34d399;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.live.loading{background:rgba(245,158,11,.15);border-color:rgba(245,158,11,.3);color:#fbbf24}
+.live.loading .live-dot{background:#fbbf24}
+.live.error{background:rgba(239,68,68,.12);border-color:rgba(239,68,68,.3);color:#f87171}
+.live.error .live-dot{background:#f87171;animation:none}
+.nav{background:var(--sur);border-bottom:1px solid var(--brd);display:flex;overflow-x:auto;padding:0 28px;scrollbar-width:none}
+.nav::-webkit-scrollbar{display:none}
+.nb{padding:11px 16px;background:none;border:none;color:var(--mut2);font-family:"DM Sans",sans-serif;font-size:12px;font-weight:500;cursor:pointer;white-space:nowrap;border-bottom:2px solid transparent;transition:all .15s}
+.nb:hover{color:var(--txt)}.nb.active{color:var(--acc);border-bottom-color:var(--acc)}
+.main{padding:20px 28px;max-width:1500px;margin:0 auto}
+.tab{display:none}.tab.active{display:block}
+.kpi-g{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:12px;margin-bottom:18px}
+.kpi{background:var(--sur);border:1px solid var(--brd);border-radius:12px;padding:15px 17px;position:relative;overflow:hidden;transition:transform .15s}
+.kpi:hover{transform:translateY(-2px)}
+.kpi::before{content:"";position:absolute;top:0;left:0;right:0;height:3px}
+.kpi.b::before{background:linear-gradient(90deg,#3b82f6,#8b5cf6)}
+.kpi.g::before{background:linear-gradient(90deg,#10b981,#06b6d4)}
+.kpi.a::before{background:linear-gradient(90deg,#f59e0b,#ef4444)}
+.kpi.p::before{background:linear-gradient(90deg,#8b5cf6,#ec4899)}
+.kpi.r::before{background:linear-gradient(90deg,#ef4444,#f97316)}
+.kpi-lbl{font-size:10px;color:var(--mut);font-weight:500;text-transform:uppercase;letter-spacing:.7px;margin-bottom:5px}
+.kpi-val{font-size:21px;font-weight:700;letter-spacing:-.5px;line-height:1}
+.kpi-sub{font-size:11px;color:var(--mut2);margin-top:4px}
+.up{display:inline-block;font-size:10px;font-weight:600;padding:2px 6px;border-radius:20px;background:rgba(16,185,129,.15);color:#34d399}
+.dn{display:inline-block;font-size:10px;font-weight:600;padding:2px 6px;border-radius:20px;background:rgba(239,68,68,.12);color:#f87171}
+.neu{display:inline-block;font-size:10px;font-weight:600;padding:2px 6px;border-radius:20px;background:rgba(59,130,246,.12);color:#93c5fd}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:16px}
+.g64{display:grid;grid-template-columns:6fr 4fr;gap:14px;margin-bottom:16px}
+.card{background:var(--sur);border:1px solid var(--brd);border-radius:12px;padding:16px 18px}
+.card h3{font-size:10px;font-weight:600;color:var(--mut2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:11px}
+.tbl-w{overflow:auto;max-height:480px;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.1) transparent}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;padding:7px 9px;font-size:10px;font-weight:600;color:var(--mut);text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid var(--brd);white-space:nowrap;position:sticky;top:0;background:var(--sur)}
+td{padding:7px 9px;font-size:11px;border-bottom:1px solid rgba(255,255,255,.03);white-space:nowrap}
+tr:hover td{background:rgba(255,255,255,.02)}
+.num{text-align:right;font-family:"DM Mono",monospace;font-size:11px}
+.tag{display:inline-block;font-size:10px;font-weight:600;padding:2px 7px;border-radius:10px}
+.tg-b{background:rgba(59,130,246,.12);color:#93c5fd}
+.tg-g{background:rgba(16,185,129,.15);color:#34d399}
+.tg-r{background:rgba(239,68,68,.12);color:#f87171}
+.tg-a{background:rgba(245,158,11,.12);color:#fbbf24}
+.tg-p{background:rgba(139,92,246,.12);color:#c4b5fd}
+.tg-n{background:rgba(16,185,129,.2);color:#34d399;border:1px solid rgba(16,185,129,.3)}
+.rk{width:20px;height:20px;border-radius:5px;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700}
+.r1{background:rgba(245,158,11,.2);color:#fbbf24}
+.r2{background:rgba(148,163,184,.12);color:#94a3b8}
+.r3{background:rgba(180,83,9,.15);color:#d97706}
+.rn{background:rgba(255,255,255,.05);color:var(--mut)}
+.fbar{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:11px;align-items:center}
+.fb{padding:4px 12px;border-radius:20px;background:var(--sur2);border:1px solid var(--brd);color:var(--mut2);font-family:"DM Sans",sans-serif;font-size:11px;font-weight:500;cursor:pointer;transition:all .12s}
+.fb:hover,.fb.active{background:rgba(59,130,246,.15);border-color:rgba(59,130,246,.4);color:var(--acc)}
+.srch{background:var(--sur2);border:1px solid var(--brd);color:var(--txt);padding:6px 11px;border-radius:8px;font-family:"DM Sans",sans-serif;font-size:12px;width:220px;outline:none}
+.srch:focus{border-color:rgba(59,130,246,.5)}
+select.sel{background:var(--sur2);border:1px solid var(--brd);color:var(--txt);padding:6px 10px;border-radius:8px;font-family:"DM Sans",sans-serif;font-size:12px;outline:none}
+.sl-row{display:flex;align-items:center;gap:10px;background:var(--sur2);border:1px solid var(--brd);border-radius:10px;padding:11px 14px;margin-bottom:14px}
+.sl-row label{font-size:12px;font-weight:500;white-space:nowrap}
+input[type=range]{flex:1;accent-color:var(--acc)}
+.slval{font-size:18px;font-weight:700;color:var(--acc);font-family:"DM Mono",monospace;min-width:50px;text-align:right}
+.pct-bar{display:flex;align-items:center;gap:5px;justify-content:flex-end}
+.pct-fill{height:6px;border-radius:3px;background:#3b82f6;min-width:1px;flex-shrink:0}
+.pct-bar span{font-size:11px;font-family:"DM Mono",monospace;min-width:40px;text-align:right}
+.new-badge{display:inline-block;font-size:9px;font-weight:700;padding:1px 5px;border-radius:10px;background:rgba(16,185,129,.2);color:#34d399;border:1px solid rgba(16,185,129,.3);margin-left:4px}
+.cal{display:flex;flex-direction:column;gap:5px}
+.ci{display:grid;grid-template-columns:105px 100px 1fr;align-items:center;gap:10px;background:var(--sur2);border-radius:8px;padding:8px 12px;border:1px solid var(--brd)}
+.ci-w{font-size:10px;font-family:"DM Mono",monospace;color:var(--mut2)}
+.ci-p{font-size:10px;font-weight:600;padding:2px 7px;border-radius:20px;text-align:center}
+.ci-l{font-size:12px}
+.note{font-size:11px;color:var(--mut);border-top:1px solid var(--brd);margin-top:9px;padding-top:8px}
+@media(max-width:800px){.g2,.g3,.g64{grid-template-columns:1fr}.main{padding:12px 14px}.nav{padding:0 12px}.ci{grid-template-columns:1fr}}
 
-function doGet(e) {
-  const type     = e && e.parameter && e.parameter.type;
-  const callback = e && e.parameter && e.parameter.callback;
-  let data;
+/* Барааны нэр custom tooltip */
+td[data-name] { position: relative; cursor: default; }
+td[data-name]:hover::after {
+  content: attr(data-name);
+  position: fixed;
+  background: #1e293b;
+  color: #f1f5f9;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  white-space: nowrap;
+  z-index: 9999;
+  border: 1px solid #334155;
+  box-shadow: 0 4px 12px rgba(0,0,0,.5);
+  pointer-events: none;
+  max-width: 400px;
+  white-space: normal;
+  line-height: 1.4;
+  margin-top: -30px;
+}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="hdr-l">
+    <div class="logo">M</div>
+    <div>
+      <h1>Market.mn — Аяны Бараа 2026 Стратеги</h1>
+      <p>2024–2025 борлуулалт + Sheet2 шинэ өртөг/үнэ дээр суурилсан прогноз</p>
+    </div>
+  </div>
+  <div class="live loading" id="live-badge">
+    <div class="live-dot"></div>
+    <span id="live-text">Sheet2 ачааллаж байна...</span>
+  </div>
+</div>
+
+<nav class="nav">
+  <button class="nb active" onclick="ST('ov',this)">🏠 Нийт дүгнэлт</button>
+  <button class="nb" onclick="ST('forecast',this)">📈 2026 Прогноз</button>
+  <button class="nb" onclick="ST('orders',this)">📋 Захиалгын тооцоо</button>
+  <button class="nb" onclick="ST('cat',this)">📦 Ангилал</button>
+  <button class="nb" onclick="ST('price',this)">💰 Үнэ/Өртгийн өөрчлөлт</button>
+  <button class="nb" onclick="ST('drop',this)">🚫 2026-д зарахгүй</button>
+  <button class="nb" onclick="ST('mkt',this)">📣 Маркетинг</button>
+  <button class="nb" onclick="ST('hist',this)">📊 Өнгөрсөн анализ</button>
+  <button class="nb" onclick="ST('plan',this)">🗓️ Sales Plan 2026</button>
+  <button class="nb" onclick="ST('actual',this)">📊 2026 Гүйцэтгэл</button>
+</nav>
+
+<div class="main">
+
+<!-- НИЙТ ДҮГНЭЛТ -->
+<div id="t-ov" class="tab active">
+  <div class="kpi-g" id="kp-ov">
+    <div class="kpi b"><div class="kpi-lbl">Ачааллаж байна</div><div class="kpi-val">...</div></div>
+  </div>
+  <div class="g64">
+    <div class="card"><h3>Сарын орлого — 2025 факт vs 2026 прогноз</h3><div style="height:230px"><canvas id="c-mrev"></canvas></div></div>
+    <div class="card">
+      <h3>2026 Борлуулалтын зорилт тааруулагч</h3>
+      <div class="sl-row"><label>Өсөлтийн зорилт:</label><input type="range" id="sl-g" min="10" max="100" value="20" step="5" oninput="updGrowth(this.value)"><div class="slval" id="sl-v">+20%</div></div>
+      <div id="growth-cards"></div>
+    </div>
+  </div>
+  <div class="g2">
+    <div class="card"><h3>Ангилал бүрийн 2026 прогноз орлого + хувь%</h3><div style="height:220px"><canvas id="c-cat-prog"></canvas></div></div>
+    <div class="card"><h3>Ашигт ажиллагаа% — 2025 факт vs 2026 прогноз</h3><div style="height:220px"><canvas id="c-margin-comp"></canvas></div></div>
+  </div>
+</div>
+
+<!-- 2026 ПРОГНОЗ -->
+<div id="t-forecast" class="tab">
+  <div class="sl-row"><label>Өсөлтийн зорилт:</label><input type="range" id="sl-fc" min="10" max="100" value="20" step="5" oninput="updForecast(this.value)"><div class="slval" id="sl-fc-v">+20%</div></div>
+  <div class="kpi-g" id="kp-fc"></div>
+  <div class="fbar">
+    <input class="srch" id="fc-srch" placeholder="🔍 Бараа хайх..." oninput="renderFcTbl()">
+    <div id="fc-cf" style="display:flex;gap:5px;flex-wrap:wrap"></div>
+    <select class="sel" id="fc-srt" onchange="renderFcTbl()">
+      <option value="rev26">2026 орлогоор</option>
+      <option value="pct26">2026 Ашиг%-аар</option>
+      <option value="rev_growth">Өсөлт%-аар</option>
+      <option value="qty26">Тоо ширхэгээр</option>
+    </select>
+    <label style="font-size:11px;color:var(--mut2);display:flex;align-items:center;gap:4px">
+      <input type="checkbox" id="fc-new-only" onchange="renderFcTbl()"> Шинэ бараа л
+    </label>
+  </div>
+  <div class="card"><div class="tbl-w" style="max-height:580px"><table id="fc-tbl"></table></div></div>
+</div>
+
+<!-- ЗАХИАЛГЫН ТООЦОО -->
+<div id="t-orders" class="tab">
+  <div class="sl-row"><label>2026 өсөлт:</label><input type="range" id="sl-ord" min="10" max="100" value="20" step="5" oninput="updOrd(this.value)"><div class="slval" id="sl-ord-v">+20%</div></div>
+  <div class="kpi-g" id="kp-ord"></div>
+  <div class="fbar">
+    <input class="srch" id="ord-srch" placeholder="🔍 Бараа хайх..." oninput="renderOrdTbl()">
+    <div id="ord-cf" style="display:flex;gap:5px;flex-wrap:wrap"></div>
+    <div id="ord-source-f" style="display:flex;gap:5px;flex-wrap:wrap;border-left:1px solid var(--brd);padding-left:8px;margin-left:4px"></div>
+  </div>
+  <div class="card"><h3 id="ord-ttl">Захиалгын тооцоо (+30% зорилт)</h3>
+    <div class="tbl-w" style="max-height:560px"><table id="ord-tbl"></table></div>
+  </div>
+</div>
+
+<!-- АНГИЛАЛ -->
+<div id="t-cat" class="tab">
+  <div class="kpi-g" id="kp-cat"></div>
+  <div class="g2">
+    <div class="card"><h3>Ангилал — 2025 vs 2026 орлого + хувь%</h3><div style="height:250px"><canvas id="c-cat-bar"></canvas></div></div>
+    <div class="card"><h3>Ангилал — 2026 Ашиг%</h3><div style="height:250px"><canvas id="c-cat-prf"></canvas></div></div>
+  </div>
+  <div class="card"><div class="tbl-w"><table id="cat-tbl"></table></div></div>
+</div>
+
+<!-- ҮНЭ/ӨРТГИЙН ӨӨРЧЛӨЛТ -->
+<div id="t-price" class="tab">
+  <div class="kpi-g" id="kp-price"></div>
+  <div class="g2">
+    <div class="card"><h3>Үнийн өөрчлөлт% (2025→2026)</h3><div style="height:230px"><canvas id="c-price-chg"></canvas></div></div>
+    <div class="card"><h3>Өртгийн өөрчлөлт% (2025→2026)</h3><div style="height:230px"><canvas id="c-cost-chg"></canvas></div></div>
+  </div>
+  <div class="fbar"><input class="srch" id="pr-srch" placeholder="🔍 Хайх..." oninput="renderPriceTbl()"></div>
+  <div class="card"><div class="tbl-w" style="max-height:500px"><table id="pr-tbl"></table></div></div>
+
+  <!-- Ашиг тооцоолуур -->
+  <div class="card" style="margin-top:16px">
+    <h3 style="margin-bottom:16px">🧮 Ашигт ажиллагааны тооцоолуур — Шинэ өртөг/үнэ/тоогоор</h3>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:18px">
+      <div>
+        <label style="font-size:11px;color:var(--mut2);display:block;margin-bottom:4px">Бараа сонгох</label>
+        <select class="sel" id="calc-prod" onchange="calcProfit()" style="width:100%"></select>
+      </div>
+      <div>
+        <label style="font-size:11px;color:var(--mut2);display:block;margin-bottom:4px">Нэгж өртөг (₮)</label>
+        <input type="number" id="calc-cost" class="srch" style="width:100%" placeholder="0" oninput="calcProfit()">
+      </div>
+      <div>
+        <label style="font-size:11px;color:var(--mut2);display:block;margin-bottom:4px">Зарах үнэ (₮)</label>
+        <input type="number" id="calc-price" class="srch" style="width:100%" placeholder="0" oninput="calcProfit()">
+      </div>
+      <div>
+        <label style="font-size:11px;color:var(--mut2);display:block;margin-bottom:4px">Захиалах тоо (ш)</label>
+        <input type="number" id="calc-qty" class="srch" style="width:100%" placeholder="0" oninput="calcProfit()">
+      </div>
+    </div>
+    <!-- Зардлын таамаглал -->
+    <div style="background:var(--sur2);border-radius:10px;padding:14px;margin-bottom:16px">
+      <div style="font-size:11px;font-weight:600;color:var(--mut2);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px">Бусад зардлын таамаглал (2025-н дундаж дээр суурилсан)</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px">
+        <div>
+          <label style="font-size:11px;color:var(--mut2);display:block;margin-bottom:3px">Маркетинг/Ads (орлогын %)</label>
+          <div style="display:flex;align-items:center;gap:8px">
+            <input type="range" id="calc-ads-pct" min="0" max="30" value="5.32" step="0.1" oninput="document.getElementById('calc-ads-v').textContent=this.value+'%';calcProfit()">
+            <span id="calc-ads-v" style="font-size:12px;font-weight:600;color:var(--acc);min-width:32px">5.32%</span>
+          </div>
+        </div>
+        <div>
+          <label style="font-size:11px;color:var(--mut2);display:block;margin-bottom:3px">Хүргэлт (орлогын %)</label>
+          <div style="display:flex;align-items:center;gap:6px"><input type="range" id="calc-delivery" min="0" max="5" value="0.2" step="0.1" oninput="document.getElementById('calc-del-v').textContent=this.value+'%';calcProfit()"><span id="calc-del-v" style="font-size:11px;font-weight:600;color:var(--acc);min-width:32px">0.2%</span></div>
+        </div>
+        <div>
+          <label style="font-size:11px;color:var(--mut2);display:block;margin-bottom:3px">Оператор (орлогын %)</label>
+          <div style="display:flex;align-items:center;gap:6px"><input type="range" id="calc-operator" min="0" max="10" value="1.1" step="0.1" oninput="document.getElementById('calc-ops-v').textContent=this.value+'%';calcProfit()"><span id="calc-ops-v" style="font-size:11px;font-weight:600;color:var(--acc);min-width:32px">1.1%</span></div>
+        </div>
+        <div>
+          <label style="font-size:11px;color:var(--mut2);display:block;margin-bottom:3px">Тогтмол зардал (орлогын %)</label>
+          <div style="display:flex;align-items:center;gap:6px"><input type="range" id="calc-fixed" min="0" max="30" value="12.34" step="0.1" oninput="document.getElementById('calc-fix-v').textContent=this.value+'%';calcProfit()"><span id="calc-fix-v" style="font-size:11px;font-weight:600;color:var(--acc);min-width:32px">12.34%</span></div>
+        </div>
+      </div>
+        <div>
+          <label style="font-size:11px;color:var(--mut2);display:block;margin-bottom:3px">Нөат татвар (орлогын %)</label>
+          <div style="display:flex;align-items:center;gap:6px">
+            <input type="range" id="calc-tax" min="0" max="10" value="2.0" step="0.5" oninput="document.getElementById('calc-tax-v').textContent=this.value+'%';calcProfit()">
+            <span id="calc-tax-v" style="font-size:11px;font-weight:600;color:var(--acc);min-width:32px">2.0%</span>
+          </div>
+        </div>
+    </div>
+    <!-- Үр дүн -->
+    <div id="calc-result" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px"></div>
+  </div>
+</div>
+
+<!-- 2026-Д ЗАРАХГҮЙ -->
+<div id="t-drop" class="tab">
+  <div class="kpi-g" id="kp-drop"></div>
+  <div class="g2" style="margin-bottom:14px">
+    <div class="card"><h3>Ангилал бүрийн орлого (зарахгүй) — 2024 vs 2025</h3><div style="height:230px"><canvas id="c-drop-cat"></canvas></div></div>
+    <div class="card"><h3>Хасах шийдвэрийн шинжилгээ</h3><div id="drop-reason" style="padding:4px 0"></div></div>
+  </div>
+  <div class="fbar">
+    <input class="srch" id="drop-srch" placeholder="🔍 Бараа хайх..." oninput="renderDropTbl()">
+    <div id="drop-cf" style="display:flex;gap:5px;flex-wrap:wrap"></div>
+    <select class="sel" id="drop-srt" onchange="renderDropTbl()">
+      <option value="rev_tot">Нийт орлогоор</option>
+      <option value="rev25">2025 орлогоор</option>
+      <option value="pct25">2025 ашиг%-аар</option>
+    </select>
+    <select class="sel" id="drop-filt" onchange="renderDropTbl()">
+      <option value="all">Бүгд</option>
+      <option value="sold">Зарагдсан байсан</option>
+      <option value="never">Огт зарагдаагүй</option>
+    </select>
+  </div>
+  <div class="card"><h3 id="drop-ttl">2026-д зарахгүй бараанууд</h3>
+    <div class="tbl-w" style="max-height:580px"><table id="drop-tbl"></table></div>
+  </div>
+</div>
+
+<!-- МАРКЕТИНГ -->
+<div id="t-mkt" class="tab">
+  <div class="kpi-g" id="kp-mkt"></div>
+  <div class="g2">
+    <div class="card"><h3>2025 Ads vs 2026 Ads санал</h3><div style="height:210px"><canvas id="c-ads"></canvas></div></div>
+    <div class="card"><h3>Ангилал бүрийн ads хуваарилалт (2025)</h3><div style="height:210px"><canvas id="c-alloc"></canvas></div></div>
+  </div>
+  <div class="card"><h3 style="margin-bottom:13px">📅 2026 Маркетингийн Хуанли</h3>
+    <div class="cal" id="cal"></div>
+    <div class="note">💡 7-р сарт хамгийн их ads. Хийлдэг майхан тренд — эрт нөөц бэлд!</div>
+  </div>
+</div>
+
+<!-- ӨНГӨРСӨН АНАЛИЗ TAB -->
+<div id="t-hist" class="tab">
+  <div style="display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
+    <button class="fb active" onclick="setHistYear('all',this)">📊 Бүгд</button>
+    <button class="fb" onclick="setHistYear(2024,this)">2024</button>
+    <button class="fb" onclick="setHistYear(2025,this)">2025</button>
+    <div style="border-left:1px solid var(--brd);padding-left:8px;margin-left:4px;display:flex;gap:4px">
+      <button class="fb" onclick="setHistYear('5',this)">5-р сар</button>
+      <button class="fb" onclick="setHistYear('6',this)">6-р сар</button>
+      <button class="fb" onclick="setHistYear('7',this)">7-р сар</button>
+      <button class="fb" onclick="setHistYear('8',this)">8-р сар</button>
+    </div>
+  </div>
+  <div class="kpi-g" id="kp-hist"></div>
+  <div class="g2" style="margin-bottom:16px">
+    <div class="card"><h3 id="hist-rev-ttl">Сарын орлого харьцуулалт</h3><div style="height:220px"><canvas id="c-hist-rev"></canvas></div></div>
+    <div class="card"><h3>Ашигт ажиллагаа % болон ROAS</h3><div style="height:220px"><canvas id="c-hist-prf"></canvas></div></div>
+  </div>
+  <div class="fbar" style="margin-bottom:12px">
+    <input class="srch" id="hist-srch" placeholder="🔍 Бараа хайх (нэр/код)..." oninput="renderHistTbl()" style="width:260px">
+    <div id="hist-cat-f" style="display:flex;gap:5px;flex-wrap:wrap"></div>
+    <select class="sel" id="hist-srt" onchange="renderHistTbl()">
+      <option value="rev">Орлогоор</option>
+      <option value="profit_pct">Ашиг%-аар</option>
+      <option value="qty">Тоо ширхэгээр</option>
+      <option value="roas">ROAS-аар</option>
+      <option value="ret_pct">Буцаалтаар</option>
+    </select>
+    <label style="font-size:11px;color:var(--mut2);display:flex;align-items:center;gap:4px">
+      <input type="checkbox" id="hist-sell-only" onchange="renderHistTbl()"> 2026-д зарах л
+    </label>
+  </div>
+  <div class="card">
+    <h3 id="hist-tbl-ttl">Барааны дэлгэрэнгүй анализ</h3>
+    <div class="tbl-w" style="max-height:600px"><table id="hist-tbl"></table></div>
+  </div>
+</div>
+
+<!-- SALES PLAN 2026 TAB -->
+<div id="t-plan" class="tab">
+  <div class="kpi-g" id="kp-plan"></div>
+  <div class="g2" style="margin-bottom:16px">
+    <div class="card">
+      <h3>Сарын борлуулалтын прогноз (ш)</h3>
+      <div style="height:200px"><canvas id="c-plan-qty"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>Сарын орлогын прогноз (₮)</h3>
+      <div style="height:200px"><canvas id="c-plan-rev"></canvas></div>
+    </div>
+  </div>
+  <div class="fbar" style="margin-bottom:12px">
+    <input class="srch" id="plan-srch" placeholder="🔍 Бараа хайх..." oninput="renderPlanTbl()" style="width:220px">
+    <div id="plan-cat-f" style="display:flex;gap:5px;flex-wrap:wrap"></div>
+    <select class="sel" id="plan-view" onchange="renderPlanTbl()">
+      <option value="qty">Тоо (ш)</option>
+      <option value="rev">Орлого (₮)</option>
+      <option value="cost">Өртгийн нийлбэр (₮)</option>
+    </select>
+  </div>
+  <div class="card">
+    <div class="tbl-w" style="max-height:600px">
+      <table id="plan-tbl"></table>
+    </div>
+  </div>
+  <div style="margin-top:12px;padding:10px 14px;background:var(--sur2);border-radius:8px;font-size:11px;color:var(--mut2);line-height:1.6">
+    💡 Үлдэгдэлтэй бараа → бүтэн сезон. Үлдэгдэлгүй → тасарсан сар хүртэл. Шинэ бараа → ангиллын дундаж %.
+  </div>
+</div>
+
+<!-- 2026 ГҮЙЦЭТГЭЛ TAB -->
+<div id="t-actual" class="tab">
+  <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap">
+    <div style="font-size:12px;color:var(--mut2);font-weight:500">📅 Хугацаа:</div>
+    <button class="fb active" id="act-range-all" onclick="setActualRange('all',this)">Нийт (5/1–өнөөдөр)</button>
+    <button class="fb" id="act-range-m5" onclick="setActualRange('m5',this)">5-р сар</button>
+    <button class="fb" id="act-range-m6" onclick="setActualRange('m6',this)">6-р сар</button>
+    <button class="fb" id="act-range-m7" onclick="setActualRange('m7',this)">7-р сар</button>
+    <button class="fb" id="act-range-m8" onclick="setActualRange('m8',this)">8-р сар</button>
+    <div style="display:flex;gap:6px;align-items:center;margin-left:8px">
+      <input type="date" id="act-from" class="sel" style="width:130px;font-size:11px" onchange="setActualRange('custom',null)">
+      <span style="color:var(--mut2);font-size:11px">–</span>
+      <input type="date" id="act-to" class="sel" style="width:130px;font-size:11px" onchange="setActualRange('custom',null)">
+    </div>
+    <div id="act-status" style="margin-left:auto;font-size:11px;color:var(--mut2)">⏳ Ачааллаж байна...</div>
+  </div>
+  <div class="card" style="margin-bottom:14px;padding:16px 20px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div>
+        <div style="font-size:12px;color:var(--mut2);margin-bottom:4px">🎯 НИЙТ ЗОРИЛГО — ₮1,540,000,000</div>
+        <div id="act-target-info" style="font-size:11px;color:var(--mut2)">Өнөөдрийн байдлаар...</div>
+      </div>
+      <div style="text-align:right">
+        <div id="act-pct-big" style="font-size:28px;font-weight:700;color:#34d399">0%</div>
+        <div style="font-size:11px;color:var(--mut2)">биелэлт</div>
+      </div>
+    </div>
+    <div style="position:relative;height:18px;background:var(--sur2);border-radius:9px;overflow:hidden;margin-bottom:8px">
+      <div id="act-bar-plan" style="position:absolute;height:100%;background:#334155;border-radius:9px;transition:width .5s"></div>
+      <div id="act-bar-actual" style="position:absolute;height:100%;background:linear-gradient(90deg,#10b981,#34d399);border-radius:9px;transition:width .5s"></div>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--mut2)">
+      <div id="act-bar-label-left">Бодит: ₮0</div>
+      <div id="act-bar-label-plan">Төлөвлөгөө: ₮0</div>
+      <div id="act-bar-label-right">Зорилго: ₮1.54B</div>
+    </div>
+  </div>
+  <div class="kpi-g" id="kp-actual" style="margin-bottom:14px"></div>
+  <div class="g2" style="margin-bottom:14px">
+    <div class="card">
+      <h3>📈 Өдрийн борлуулалт — Бодит vs Прогноз</h3>
+      <div style="height:220px"><canvas id="c-actual-daily"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>📊 Хуримтлагдах орлого — Бодит vs Прогноз</h3>
+      <div style="height:220px"><canvas id="c-actual-cum"></canvas></div>
+    </div>
+  </div>
+  <div class="fbar" style="margin-bottom:10px;flex-wrap:wrap;gap:8px">
+    <input class="srch" id="act-srch" placeholder="🔍 Бараа хайх (нэр/код)..." oninput="renderActualTbl()" style="width:200px">
+    <div id="act-cat-f" style="display:flex;gap:5px;flex-wrap:wrap"></div>
+    <select class="sel" id="act-srt" onchange="renderActualTbl()">
+      <option value="rev">Орлогоор</option>
+      <option value="qty">Тоогоор</option>
+      <option value="profit_pct">Ашиг%-аар</option>
+      <option value="roas">ROAS-аар</option>
+      <option value="pct_rev">Биелэлт%-аар</option>
+    </select>
+    <select class="sel" id="act-tbl-month" onchange="renderActualTbl()" title="Барааны жагсаалтыг сараар шүүх">
+      <option value="all">📅 Бүх сар</option>
+      <option value="5">5-р сар</option>
+      <option value="6">6-р сар</option>
+      <option value="7">7-р сар</option>
+      <option value="8">8-р сар</option>
+    </select>
+    <label style="font-size:11px;color:var(--mut2);display:flex;align-items:center;gap:4px">
+      <input type="checkbox" id="act-diff-only" onchange="renderActualTbl()"> Зөрүүтэй л
+    </label>
+    <label style="font-size:11px;color:var(--mut2);display:flex;align-items:center;gap:4px">
+      <input type="checkbox" id="act-zero-show" onchange="renderActualTbl()" checked> 0 борлуулалт харуулах
+    </label>
+  </div>
+  <div class="card">
+    <div class="tbl-w" style="max-height:600px">
+      <table id="actual-tbl"></table>
+    </div>
+  </div>
+</div>
+
+</div>
+
+
+<script>
+// ══════ ЗАРДЛЫН БҮТЭЦ (2025-н факт дата) ══════
+const CS = {
+  cost_pct:61.14,
+  delivery_pct:0.21,
+  operator_pct:1.11,
+  fixed_pct:12.5,
+  ads_pct:6.91,
+  bonus_pct:0.35,
+  tax_pct:1.66,
+  profit_pct:16.12,
+};
+// Нийт зардлын % (өртөгөөс бусад)
+const OPEX_PCT = CS.delivery_pct + CS.operator_pct + CS.fixed_pct + CS.ads_pct + CS.bonus_pct + CS.tax_pct;
+
+// ══════════════════════════════════════════════
+// ТОХИРГОО — Apps Script URL-ийг оруулна
+// ══════════════════════════════════════════════
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxHP1CcQ4R6ylaQPGUwyH9AC3XsCSqZdutyFujJN6n2U0Y7Oq7p6SGGJyuDEthsoU0L/exec';
+
+// 2024-2025 статик дата (GitHub-д хадгалагдсан)
+const STATIC = null; // data.json-аас татна
+// Runtime state — Apps Script-аас татна
+let HIST        = [];
+let CATS        = [];
+let SUM         = {};
+let SHEET2      = [];
+let FC          = [];
+let LOADED      = false;
+let ACTUAL2026  = null;
+let actualFilter= { from: null, to: null };
+let CAT_ADS_PCT = {};  // Ангиллын ads% — Apps Script-аас
+
+// ══════ Helpers ══════
+const fmt = n => {
+  if(n===undefined||n===null) return '—';
+  const a=Math.abs(n), s=n<0?'-':'';
+  return a>=1e9?s+'₮'+(a/1e9).toFixed(2)+'B':a>=1e6?s+'₮'+(a/1e6).toFixed(1)+'M':a>=1e3?s+'₮'+(a/1e3).toFixed(0)+'K':s+'₮'+Math.round(a);
+};
+const fN = n => Math.round(n||0).toLocaleString();
+const CL = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#06b6d4','#f97316','#ec4899','#84cc16','#14b8a6'];
+
+Chart.defaults.color='#64748b';
+Chart.defaults.borderColor='rgba(255,255,255,.06)';
+Chart.defaults.font.family='"DM Sans",sans-serif';
+
+let CHS={};
+const dch=id=>{if(CHS[id]){CHS[id].destroy();delete CHS[id];}};
+
+function bC(id,labels,ds,opts={}) {
+  dch(id);
+  const el=document.getElementById(id);
+  if(!el) return;
+  const fullLabels=labels.map(l=>(l+'').split('\n')[0].split(' (')[0]);
+  CHS[id]=new Chart(el.getContext('2d'),{
+    type:'bar',
+    data:{labels,datasets:ds},
+    options:{
+      responsive:true,
+      maintainAspectRatio:false,
+      plugins:{
+        legend:{position:'top',labels:{boxWidth:8,font:{size:10}}},
+        tooltip:{callbacks:{title:t=>{
+          const i=t[0]?.dataIndex;
+          return i!==undefined&&fullLabels[i]?fullLabels[i]:t[0]?.label||'';
+        }}}
+      },
+      scales:{
+        x:{grid:{display:false},ticks:{font:{size:10},maxRotation:40}},
+        y:{grid:{color:'rgba(255,255,255,.04)'},ticks:{font:{size:10},callback:v=>opts.pct?v+'%':opts.x?v+'x':fmt(v)}}
+      },
+      ...opts
+    }
+  });
+}
+
+function doughC(id,labels,data,colors) {
+  dch(id);
+  const el=document.getElementById(id);
+  if(!el) return;
+  CHS[id]=new Chart(el.getContext('2d'),{
+    type:'doughnut',
+    data:{labels,datasets:[{data,backgroundColor:colors,borderWidth:0,hoverOffset:5}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'60%',
+      plugins:{legend:{position:'right',labels:{boxWidth:8,font:{size:10}}}}}
+  });
+}
+
+// ══════ Tab switch ══════
+let RENDERED={};
+function ST(n,btn) {
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.nb').forEach(b=>b.classList.remove('active'));
+  document.getElementById('t-'+n).classList.add('active');
+  if(btn) btn.classList.add('active');
+  if(!RENDERED[n]) { RENDERED[n]=true; RenderTab(n); }
+}
+window.ST = ST;
+
+// ── Барааны нэр hover tooltip ──
+(function() {
+  let tip = document.createElement('div');
+  tip.style.cssText = 'position:fixed;background:#1e293b;color:#f1f5f9;padding:6px 10px;border-radius:6px;font-size:12px;z-index:9999;border:1px solid #334155;box-shadow:0 4px 12px rgba(0,0,0,.5);pointer-events:none;display:none;max-width:320px;line-height:1.4;word-break:break-word';
+  document.body.appendChild(tip);
+  document.addEventListener('mouseover', e => {
+    const td = e.target.closest('td[data-name]');
+    if (td) {
+      tip.textContent = td.dataset.name;
+      tip.style.display = 'block';
+    }
+  });
+  document.addEventListener('mousemove', e => {
+    if (tip.style.display === 'block') {
+      const x = e.clientX + 12, y = e.clientY - 30;
+      tip.style.left = (x + tip.offsetWidth > window.innerWidth ? x - tip.offsetWidth - 20 : x) + 'px';
+      tip.style.top  = (y < 0 ? e.clientY + 15 : y) + 'px';
+    }
+  });
+  document.addEventListener('mouseout', e => {
+    if (!e.target.closest('td[data-name]')) tip.style.display = 'none';
+  });
+})();
+function RenderTab(n) {
+  if(n==='ov')       renderOv();
+  if(n==='forecast') renderFc();
+  if(n==='orders')   renderOrd();
+  if(n==='cat')      renderCat();
+  if(n==='price')    renderPrice();
+  if(n==='drop')     renderDrop();
+  if(n==='hist')     { if(window.__HIST__) renderHist(); else setTimeout(renderHist,200); }
+  if(n==='plan')     renderPlan();
+  if(n==='actual') {
+    if(!ACTUAL2026) loadActual2026();
+    else renderActual();
+  }
+  if(n==='mkt')      renderMkt();
+}
+
+// ══════ Apps Script-аас татах ══════
+// Apps Script fetch - CORS зөвшөөрсөн тохиолдолд ажилладаг
+function fetchSheet2(url) {
+  return new Promise((resolve, reject) => {
+    const cbName = '_cb' + Math.random().toString(36).slice(2);
+    const script = document.createElement('script');
+    const timer = setTimeout(() => {
+      delete window[cbName];
+      document.body.removeChild(script);
+      reject(new Error('JSONP timeout'));
+    }, 10000);
+    window[cbName] = (data) => {
+      clearTimeout(timer);
+      delete window[cbName];
+      document.body.removeChild(script);
+      resolve(data);
+    };
+    script.onerror = () => {
+      clearTimeout(timer);
+      delete window[cbName];
+      document.body.removeChild(script);
+      reject(new Error('JSONP script error'));
+    };
+    const sep = url.includes('?') ? '&' : '?';
+    script.src = url + sep + 'type=sheet2&callback=' + cbName + '&t=' + Date.now();
+    document.body.appendChild(script);
+  });
+}
+
+async function loadSheet2() {
+  const badge = document.getElementById('live-badge');
+  const text  = document.getElementById('live-text');
+  badge.className='live loading';
+  text.textContent='Sheet2 ачааллаж байна...';
+
   try {
-    if      (type === 'sheet2')     data = getSheet2Data();
-    else if (type === 'hist')       data = getHistData();
-    else if (type === 'static')     data = getStaticData();
-    else if (type === 'actual2026') data = getActual2026();
-    else if (type === 'plan')       data = getPlanData();
-    else                            data = { sheet2: getSheet2Data(), updated: new Date().toISOString(), status: 'ok' };
+    // JSONP ашиглана — Apps Script CORS-г дэмждэг
+    const data = await fetchSheet2(APPS_SCRIPT_URL);
+    SHEET2 = Array.isArray(data) ? data : (data.sheet2 || []);
+
+    // ⭐ Sheet2-аас sell2026 flag-г HIST-д sync хийнэ
+    // Google Sheets-д "Тийм"/"хоосон" өөрчлөхөд dashboard шинэчлэгдэнэ
+    if (SHEET2.length > 0) {
+      const sellSet = new Set(SHEET2.filter(p=>p.sell2026).map(p=>p.code));
+      HIST.forEach(h => { h.sell2026 = sellSet.has(h.code); });
+      console.log('✅ sell2026 sync:', sellSet.size, 'бараа 2026-д зарна');
+    }
+
+    badge.className='live';
+    text.textContent='Live — Sheet2 (' + new Date().toLocaleTimeString() + ')';
+    LOADED=true;
+
+    // Тооцоолж дахин рендерлэнэ
+    FC = calcFC(20);
+    Object.keys(RENDERED).forEach(k=>{
+      RENDERED[k]=false;
+    });
+    RenderTab('ov');
+    RENDERED['ov']=true;
+
   } catch(err) {
-    data = { status: 'error', message: err.message };
+    console.error('Sheet2 load error:', err);
+    badge.className='live error';
+    text.textContent='Sheet2 ачаалаагүй — статик горим';
+    // Статик горим: HIST-аас sell2026 ашиглан SHEET2 бүрдүүлнэ
+    if(HIST.length === 0) { console.warn('HIST хоосон — data.json ачаалаагүй'); return; }
+    SHEET2 = HIST.filter(h=>h.sell2026).map(h=>({
+      code: h.code, name: h.name,
+      cat1: h.cat1||'', cat2: h.cat2||'',
+      sell2026: true, is_new: false,
+      cost2026: h.cost25||0, price2026: h.price25||0,
+      order_qty: 0, margin2026: h.pct25||0,
+    }));
+    FC = calcFC(20);
+    // Rendered flag reset хийж дахин рендерлэнэ
+    RENDERED = {};
+    RenderTab('ov');
+    RENDERED['ov'] = true;
   }
-  const json = JSON.stringify(data);
-  if (callback) {
-    return ContentService.createTextOutput(callback + '(' + json + ')')
-      .setMimeType(ContentService.MimeType.JAVASCRIPT);
-  }
-  return ContentService.createTextOutput(json).setMimeType(ContentService.MimeType.JSON);
 }
 
-function doOptions(e) {
-  return ContentService.createTextOutput('').setMimeType(ContentService.MimeType.TEXT);
-}
+// ══════ Forecast тооцоо ══════
+function calcFC(g) {
+  const gr = 1 + g/100;
+  const MIN_MARGIN = 0;      // Margin floor: хасахаас дээш байх
+  const OPEX_PCT = CS.delivery_pct + CS.operator_pct + CS.fixed_pct + CS.bonus_pct + CS.tax_pct;
 
-// ══════════════════════════════════════════════
-// SHEET2
-// ══════════════════════════════════════════════
-function getSheet2Data() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sh = ss.getSheetByName('Sheet2');
-  if (!sh) return [];
-  const lastRow = sh.getLastRow();
-  if (lastRow < 2) return [];
-  const vals = sh.getRange(1, 1, lastRow, 10).getValues();
-  const CI = { code:0, name:1, cat1:2, cat2:3, flag:4, cost:5, price:6, order:7, isnew:8 };
-  const products = [];
-  for (let i = 1; i < vals.length; i++) {
-    const r    = vals[i];
-    const code = (r[CI.code] || '').toString().trim();
-    const name = (r[CI.name] || '').toString().trim();
-    if (!code && !name) continue;
-    const cost  = parseFloat(r[CI.cost])  || 0;
-    const price = parseFloat(r[CI.price]) || 0;
-    const order = parseFloat(r[CI.order]) || 0;
-    products.push({
-      code, name,
-      cat1:     (r[CI.cat1]  || '').toString().trim(),
-      cat2:     (r[CI.cat2]  || '').toString().trim(),
-      sell2026: (r[CI.flag]  || '').toString().trim() === 'Тийм',
-      is_new:   (r[CI.isnew] || '').toString().trim() === 'Тийм',
-      cost2026: cost, price2026: price, order_qty: order,
-      has_cost: cost > 0, has_price: price > 0, has_order: order > 0,
-      margin2026: (price > 0 && cost > 0) ? Math.round((price-cost)/price*1000)/10 : 0,
-    });
-  }
-  Logger.log('Sheet2: ' + products.length + ' бараа');
-  return products;
-}
+  const source = SHEET2.length > 0 ? SHEET2.filter(p=>p.sell2026) :
+    HIST.filter(h=>h.sell2026).map(h=>({
+      code:h.code, name:h.name, cat1:h.cat1||'', cat2:h.cat2||'',
+      sell2026:true, is_new:h.is_new||false,
+      cost2026:h.cost25||0, price2026:h.price25||0,
+      order_qty:0, margin2026:h.pct25||0,
+    }));
 
-// ══════════════════════════════════════════════
-// PLAN DATA — Sheet2-аас борлуулалтын төлөвлөгөө
-// sell2026='Тийм' бараа бүрийн plan_qty, plan_rev, plan_cost
-// ══════════════════════════════════════════════
-function getPlanData() {
-  const ss  = SpreadsheetApp.getActiveSpreadsheet();
-  const sh2 = ss.getSheetByName('Sheet2');
-  if (!sh2) return { error: 'Sheet2 олдсонгүй' };
+  return source.map(p=>{
+    const h = HIST.find(x=>x.code===p.code)||{};
+    const qty25    = h.qty25||0;
+    const rev25    = h.rev25||0;
+    const ads25    = h.ads25||0;
+    const has_ads  = h.has_ads||false;        // 2025-д ads ашигласан эсэх
+    const ads_pct_25 = h.ads_pct_25||0;       // 2025-н бодит ads %
 
-  const lastRow = sh2.getLastRow();
-  if (lastRow < 2) return { prod_plan: {}, updated: new Date().toISOString() };
+    const is_new   = p.is_new === true;
+    const order26  = p.order_qty>0 ? p.order_qty : Math.round(qty25*gr);
+    const qty26    = order26 || Math.round(qty25*gr);
 
-  const vals = sh2.getRange(2, 1, lastRow - 1, 9).getValues();
-  const prod_plan = {};
+    // Үнэ/өртөг: Sheet2-д байвал тэр, хоосон бол 2025-н утга
+    const price26  = p.price2026>0 ? p.price2026 : (h.price25||0);
+    const cost26   = p.cost2026>0  ? p.cost2026  : (h.cost25||0);
 
-  for (let i = 0; i < vals.length; i++) {
-    const r         = vals[i];
-    const code      = (r[0] || '').toString().trim();
-    if (!code) continue;
+    const rev26    = Math.round(price26 * qty26);
 
-    const name      = (r[1] || '').toString().trim();
-    const cat1      = (r[2] || '').toString().trim();
-    const cat2      = (r[3] || '').toString().trim();
-    const sell2026  = (r[4] || '').toString().trim() === 'Тийм';
-    const cost      = parseFloat(r[5]) || 0;
-    const price     = parseFloat(r[6]) || 0;
-    const order_qty = parseFloat(r[7]) || 0;
+    // ── Gross margin тооцоо ──
+    const cost_amt   = Math.round(cost26 * qty26);
+    const gross_prf  = rev26 - cost_amt;
+    const gross_pct  = rev26>0 ? Math.round(gross_prf/rev26*1000)/10 : 0;
 
-    if (!sell2026) continue; // Зөвхөн 2026-д зарах бараа
+    // ── Ads тооцоолол: 3 ангилал ──
+    let ads_pct_used = 0;
+    let ads_flag = 'normal';  // 'normal' | 'capped' | 'organic' | 'price_warn'
 
-    prod_plan[code] = {
-      name, cat1, cat2,
-      price, cost,
-      order_qty,
-      plan_qty:  order_qty,
-      plan_rev:  Math.round(price * order_qty),
-      plan_cost: Math.round(cost  * order_qty),
-    };
-  }
+    // ── Ангиллын ads% (ads>0 бараануудын weighted avg) ──
+    const cat_ads_pct = CAT_ADS_PCT[h.cat1] || h.cat_ads_pct || CS.ads_pct;
+    const max_ads_pct = Math.max(0, gross_pct - OPEX_PCT - MIN_MARGIN);
 
-  // Нийт зорилго тооцоолох
-  let total_target = 0;
-  let total_qty_target = 0;
-  Object.values(prod_plan).forEach(p => {
-    total_target     += p.plan_rev;
-    total_qty_target += p.plan_qty;
-  });
+    if (!has_ads || ads_pct_25 === 0) {
+      // Ads=0 бараа — органик эсвэл шинэ/идэвхгүй ялган тооцоолно
+      const is_organic = qty25 >= 10;  // ≥10ш зарагдсан → органик нотлогдсон
+      if (is_organic) {
+        // Органик: ads=0 хэвээр
+        ads_pct_used = 0;
+        ads_flag = gross_pct - OPEX_PCT < MIN_MARGIN ? 'price_warn' : 'organic';
+      } else {
+        // Шинэ эсвэл бага зарагдсан (qty25<10, qty25=0):
+        // Ангиллын ads>0 бараануудын дундаж ашиглана
+        const base_pct = Math.min(cat_ads_pct, max_ads_pct);
+        ads_pct_used = base_pct;
+        ads_flag = qty25 === 0 ? 'new_product' : 'low_volume';
+      }
+    } else {
+      // Ads > 0 бараа: Хандлага C — cap хийнэ
+      if (ads_pct_25 <= max_ads_pct) {
+        ads_pct_used = ads_pct_25;
+        ads_flag = 'normal';
+      } else {
+        ads_pct_used = max_ads_pct;
+        ads_flag = 'capped';  // 🟡 Ads cap хийгдсэн
+      }
+    }
 
-  // Өдрийн борлуулалтын төлөвлөгөө — 5/1-8/31 хооронд жигд хуваарилна
-  // 5-р сар: 31 өдөр, 6-р сар: 30 өдөр, 7-р сар: 31 өдөр, 8-р сар: 31 өдөр = 123 өдөр
-  const start = new Date('2026-05-01');
-  const end   = new Date('2026-08-31');
-  const totalDays = Math.round((end - start) / (1000*60*60*24)) + 1;
-  const dailyTarget = Math.round(total_target / totalDays);
+    const ads_amt      = Math.round(rev26 * ads_pct_used / 100);
+    const delivery_amt = Math.round(rev26 * CS.delivery_pct / 100);
+    const operator_amt = Math.round(rev26 * CS.operator_pct / 100);
+    const fixed_amt    = Math.round(rev26 * CS.fixed_pct    / 100);
+    const bonus_amt    = Math.round(rev26 * CS.bonus_pct    / 100);
+    const tax_amt      = Math.round(rev26 * CS.tax_pct      / 100);
+    const total_exp    = cost_amt + ads_amt + delivery_amt + operator_amt + fixed_amt + bonus_amt + tax_amt;
 
-  const daily_plan = {};
-  const cum_plan   = {};
-  let cum = 0;
-  for (let i = 0; i < totalDays; i++) {
-    const d = new Date(start);
-    d.setDate(d.getDate() + i);
-    const ds = d.getFullYear() + '-' +
-               String(d.getMonth()+1).padStart(2,'0') + '-' +
-               String(d.getDate()).padStart(2,'0');
-    daily_plan[ds] = dailyTarget;
-    cum += dailyTarget;
-    cum_plan[ds] = cum;
-  }
+    // Margin floor: 0-с доош бол 0 болгоно
+    let prf26 = rev26 - total_exp;
+    if (prf26 < 0) {
+      prf26 = 0;
+      if (ads_flag === 'normal' || ads_flag === 'capped') ads_flag = 'price_warn';
+    }
 
-  Logger.log('Plan: ' + Object.keys(prod_plan).length + ' бараа, total=' + Math.round(total_target/1e6) + 'M');
-  return { prod_plan, daily_plan, cum_plan, total_target, total_qty_target, updated: new Date().toISOString() };
-}
+    const pct26     = rev26>0 ? Math.round(prf26/rev26*1000)/10 : 0;
+    const price_chg = h.price25>0 ? Math.round((price26-h.price25)/h.price25*1000)/10 : 0;
+    const cost_chg  = h.cost25>0  ? Math.round((cost26-h.cost25)/h.cost25*1000)/10  : 0;
 
-// ══════════════════════════════════════════════
-// SHEET1 → Өнгөрсөн анализ
-// Sheet1-г НЭГ УДАА уншиж бүх нэгтгэлийг хийнэ
-// ══════════════════════════════════════════════
-function getHistData() {
-  const ss  = SpreadsheetApp.getActiveSpreadsheet();
-  const sh1 = ss.getSheetByName('Sheet1');
-  const sh2 = ss.getSheetByName('Sheet2');
-  if (!sh1) return { error: 'Sheet1 олдсонгүй' };
-
-  // Sheet2-аас код→мэдээлэл map
-  const codeMap = {};
-  if (sh2) {
-    const s2 = sh2.getRange(2, 1, sh2.getLastRow()-1, 5).getValues();
-    s2.forEach(r => {
-      const c = (r[0]||'').toString().trim();
-      if (c) codeMap[c] = {
-        name: (r[1]||'').toString().trim(),
-        cat1: (r[2]||'').toString().trim(),
-        cat2: (r[3]||'').toString().trim(),
-        sell2026: (r[4]||'').toString().trim() === 'Тийм',
-      };
-    });
-  }
-
-  // Sheet1 толгой мөр
-  const lastRow = sh1.getLastRow();
-  const lastCol = sh1.getLastColumn();
-  const hdr = sh1.getRange(1, 1, 1, lastCol).getValues()[0].map(h=>(h||'').toString().trim());
-
-  const fi = {
-    date:    hdr.indexOf('Огноо'),
-    code:    hdr.indexOf('Барааны код'),
-    gross_q: hdr.findIndex(h=>h.includes('Борлуулалтын дүн')&&h.includes('тоогоор')),
-    gross_r: hdr.findIndex(h=>h.includes('Борлуулалтын дүн')&&h.includes('төгрөгөөр')),
-    ret_q:   hdr.findIndex(h=>h.includes('Буцаалтын дүн')&&h.includes('тоогоор')),
-    ret_r:   hdr.findIndex(h=>h.includes('Буцаалтын дүн')&&h.includes('төгрөгөөр')),
-    net_q:   hdr.findIndex(h=>h.includes('Цэвэр борлуулалт')&&h.includes('тоогоор')),
-    net_r:   hdr.findIndex(h=>h.includes('Цэвэр борлуулалт')&&h.includes('төгрөгөөр')),
-    cost:    hdr.findIndex(h=>h.includes('өртөг')),
-    delivery:hdr.findIndex(h=>h.includes('Хүргэлт')),
-    operator:hdr.findIndex(h=>h.includes('Оператор')),
-    fixed:   hdr.findIndex(h=>h.includes('Тогтмол')),
-    ads:     hdr.findIndex(h=>h.includes('Бүүст')),
-    bonus:   hdr.findIndex(h=>h.includes('бонус')),
-    profit:  hdr.indexOf('Ашиг'),
-  };
-  Logger.log('Sheet1 fi: ' + JSON.stringify(fi));
-
-  const vals = sh1.getRange(2, 1, lastRow-1, lastCol).getValues();
-  Logger.log('Sheet1 мөр: ' + vals.length);
-
-  const ymMap  = {};
-  const moMap  = {};
-  const dayMap = {};
-
-  vals.forEach(r => {
-    const dateVal = r[fi.date];
-    if (!dateVal) return;
-    let d;
-    try { d = new Date(dateVal); } catch(e) { return; }
-    if (isNaN(d.getTime())) return;
-
-    const yr  = d.getFullYear();
-    if (yr > 2025) return;
-    const mo  = d.getMonth() + 1;
-    const day = d.getDate();
-    const dow = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()];
-    const dateStr = yr+'-'+String(mo).padStart(2,'0')+'-'+String(day).padStart(2,'0');
-    const code = (r[fi.code]||'').toString().trim();
-    const meta = codeMap[code] || { name:'', cat1:'', cat2:'', sell2026:false };
-
-    const qty    = +r[fi.net_q]   || 0;
-    const rev    = +r[fi.net_r]   || 0;
-    const gq     = +r[fi.gross_q] || 0;
-    const rq     = +r[fi.ret_q]   || 0;
-    const rr     = +r[fi.ret_r]   || 0;
-    const cost   = +r[fi.cost]    || 0;
-    const del    = +r[fi.delivery]|| 0;
-    const ops    = +r[fi.operator]|| 0;
-    const fix    = +r[fi.fixed]   || 0;
-    const ads    = +r[fi.ads]     || 0;
-    const bon    = +r[fi.bonus]   || 0;
-    const prf    = +r[fi.profit]  || 0;
-
-    const ymKey = code+'|'+meta.cat1+'|'+meta.cat2+'|'+meta.sell2026+'|'+yr+'|'+mo;
-    if (!ymMap[ymKey]) ymMap[ymKey] = {
-      code, name:meta.name, cat1:meta.cat1, cat2:meta.cat2,
-      sell2026:meta.sell2026, year:yr, month:mo,
-      qty:0,rev:0,gross_qty:0,ret_qty:0,ret_rev:0,
-      cost:0,delivery:0,operator:0,fixed:0,ads:0,bonus:0,profit:0
-    };
-    const ym = ymMap[ymKey];
-    ym.qty+=qty; ym.rev+=rev; ym.gross_qty+=gq; ym.ret_qty+=rq; ym.ret_rev+=rr;
-    ym.cost+=cost; ym.delivery+=del; ym.operator+=ops; ym.fixed+=fix;
-    ym.ads+=ads; ym.bonus+=bon; ym.profit+=prf;
-
-    const moKey = yr+'|'+mo;
-    if (!moMap[moKey]) moMap[moKey]={ year:yr,month:mo,qty:0,rev:0,ret_qty:0,cost:0,delivery:0,operator:0,fixed:0,ads:0,bonus:0,profit:0 };
-    const mm = moMap[moKey];
-    mm.qty+=qty; mm.rev+=rev; mm.ret_qty+=rq; mm.cost+=cost;
-    mm.delivery+=del; mm.operator+=ops; mm.fixed+=fix; mm.ads+=ads; mm.bonus+=bon; mm.profit+=prf;
-
-    if (!dayMap[dateStr]) dayMap[dateStr]={ date:dateStr,year:yr,month:mo,day,dow,qty:0,rev:0,profit:0,ads:0 };
-    dayMap[dateStr].qty+=qty; dayMap[dateStr].rev+=rev;
-    dayMap[dateStr].profit+=prf; dayMap[dateStr].ads+=ads;
-  });
-
-  const prod_ym = Object.values(ymMap).map(m => {
-    m.profit_pct = m.rev>0 ? Math.round(m.profit/m.rev*1000)/10 : 0;
-    m.ret_pct    = m.gross_qty>0 ? Math.round(m.ret_qty/m.gross_qty*1000)/10 : 0;
-    m.roas       = m.ads>0 ? Math.round(m.rev/m.ads*10)/10 : 0;
-    m.total_cost = m.cost+m.delivery+m.operator+m.fixed+m.ads;
-    m.avg_price  = m.qty>0 ? Math.round(m.rev/m.qty) : 0;
-    return m;
-  });
-
-  const months = Object.values(moMap).map(m => {
-    m.profit_pct = m.rev>0 ? Math.round(m.profit/m.rev*1000)/10 : 0;
-    m.roas       = m.ads>0 ? Math.round(m.rev/m.ads*10)/10 : 0;
-    return m;
-  }).sort((a,b)=>a.year*100+a.month-(b.year*100+b.month));
-
-  const days = Object.values(dayMap).sort((a,b)=>a.date.localeCompare(b.date));
-
-  Logger.log('prod_ym: '+prod_ym.length+' | months: '+months.length+' | days: '+days.length);
-  return { prod_ym, months, days, updated: new Date().toISOString() };
-}
-
-// ══════════════════════════════════════════════
-// STATIC DATA
-// ══════════════════════════════════════════════
-function getStaticData() {
-  const ss  = SpreadsheetApp.getActiveSpreadsheet();
-  const sh1 = ss.getSheetByName('Sheet1');
-  const sh2 = ss.getSheetByName('Sheet2');
-  if (!sh1 || !sh2) return { error: 'Sheet олдсонгүй' };
-
-  const sheet2 = getSheet2Data();
-
-  const lastRow = sh1.getLastRow();
-  const lastCol = sh1.getLastColumn();
-  const hdr = sh1.getRange(1, 1, 1, lastCol).getValues()[0].map(h=>(h||'').toString().trim());
-
-  const fi = {
-    date:    hdr.indexOf('Огноо'),
-    code:    hdr.indexOf('Барааны код'),
-    net_q:   hdr.findIndex(h=>h.includes('Цэвэр борлуулалт')&&h.includes('тоогоор')),
-    net_r:   hdr.findIndex(h=>h.includes('Цэвэр борлуулалт')&&h.includes('төгрөгөөр')),
-    gross_q: hdr.findIndex(h=>h.includes('Борлуулалтын дүн')&&h.includes('тоогоор')),
-    ret_q:   hdr.findIndex(h=>h.includes('Буцаалтын дүн')&&h.includes('тоогоор')),
-    cost:    hdr.findIndex(h=>h.includes('өртөг')),
-    delivery:hdr.findIndex(h=>h.includes('Хүргэлт')),
-    operator:hdr.findIndex(h=>h.includes('Оператор')),
-    fixed:   hdr.findIndex(h=>h.includes('Тогтмол')),
-    ads:     hdr.findIndex(h=>h.includes('Бүүст')),
-    bonus:   hdr.findIndex(h=>h.includes('бонус')),
-    profit:  hdr.indexOf('Ашиг'),
-    tax:     hdr.findIndex(h=>h.includes('Татвар')),
-  };
-
-  const codeMap = {};
-  const s2vals = sh2.getRange(2,1,sh2.getLastRow()-1,5).getValues();
-  s2vals.forEach(r=>{
-    const c=(r[0]||'').toString().trim();
-    if(c) codeMap[c]={name:(r[1]||'').toString().trim(),cat1:(r[2]||'').toString().trim(),cat2:(r[3]||'').toString().trim(),sell2026:(r[4]||'').toString().trim()==='Тийм'};
-  });
-
-  const vals = sh1.getRange(2,1,lastRow-1,lastCol).getValues();
-
-  const codeAgg = {};
-  const catYrAgg= {};
-  const summary = { rev_2024:0, rev_2025:0, profit_2024:0, profit_2025:0,
-                    ads_2024:0, ads_2025:0, qty_2024:0, qty_2025:0, ret_2024:0, ret_2025:0 };
-
-  vals.forEach(r=>{
-    const dv=r[fi.date]; if(!dv) return;
-    let d; try{d=new Date(dv);}catch(e){return;}
-    if(isNaN(d.getTime())) return;
-    const yr=d.getFullYear(), mo=d.getMonth()+1;
-    const code=(r[fi.code]||'').toString().trim();
-    const meta=codeMap[code]||{name:'',cat1:'',cat2:'',sell2026:false};
-
-    const qty=+r[fi.net_q]||0, rev=+r[fi.net_r]||0;
-    const gq=+r[fi.gross_q]||0, rq=+r[fi.ret_q]||0;
-    const cost=+r[fi.cost]||0, del=+r[fi.delivery]||0;
-    const ops=+r[fi.operator]||0, fix=+r[fi.fixed]||0;
-    const ads=+r[fi.ads]||0, bon=+r[fi.bonus]||0, prf=+r[fi.profit]||0;
-
-    if(!codeAgg[code]) codeAgg[code]={
-      code,name:meta.name,cat1:meta.cat1,cat2:meta.cat2,sell2026:meta.sell2026,
-      qty24:0,rev24:0,prf24:0,ads24:0,cost24_sum:0,ret24:0,
-      qty25:0,rev25:0,prf25:0,ads25:0,cost25_sum:0,ret25:0,
-      m7_qty:0,m7_tot:0,
-    };
-    const ca=codeAgg[code];
-    if(yr===2024){ca.qty24+=qty;ca.rev24+=rev;ca.prf24+=prf;ca.ads24+=ads;ca.cost24_sum+=cost;ca.ret24+=rq;}
-    if(yr===2025){ca.qty25+=qty;ca.rev25+=rev;ca.prf25+=prf;ca.ads25+=ads;ca.cost25_sum+=cost;ca.ret25+=rq;}
-    if(mo===7){ca.m7_qty+=qty;} ca.m7_tot+=qty;
-
-    const catKey=meta.cat1+'|'+yr;
-    if(!catYrAgg[catKey]) catYrAgg[catKey]={cat1:meta.cat1,year:yr,qty:0,revenue:0,profit:0,ads:0};
-    const ct=catYrAgg[catKey];
-    ct.qty+=qty; ct.revenue+=rev; ct.profit+=prf; ct.ads+=ads;
-
-    if(yr===2024){summary.rev_2024+=rev;summary.profit_2024+=prf;summary.ads_2024+=ads;summary.qty_2024+=qty;summary.ret_2024+=rq;}
-    if(yr===2025){summary.rev_2025+=rev;summary.profit_2025+=prf;summary.ads_2025+=ads;summary.qty_2025+=qty;summary.ret_2025+=rq;}
-  });
-
-  summary.sell_items = sheet2.filter(p=>p.sell2026).length;
-
-  const hist = Object.values(codeAgg).map(ca=>{
-    const price24=ca.qty24>0?Math.round(ca.rev24/ca.qty24):0;
-    const price25=ca.qty25>0?Math.round(ca.rev25/ca.qty25):0;
-    const cost24=ca.qty24>0?Math.round(ca.cost24_sum/ca.qty24):0;
-    const cost25=ca.qty25>0?Math.round(ca.cost25_sum/ca.qty25):0;
-    const pct24=ca.rev24>0?Math.round(ca.prf24/ca.rev24*1000)/10:0;
-    const pct25=ca.rev25>0?Math.round(ca.prf25/ca.rev25*1000)/10:0;
-    const m7_pct=ca.m7_tot>0?Math.round(ca.m7_qty/ca.m7_tot*1000)/10:0;
-    const ads_pct_25=ca.rev25>0?Math.round(ca.ads25/ca.rev25*1000)/10:0;
     return {
-      code:ca.code, name:ca.name, cat1:ca.cat1, cat2:ca.cat2,
-      sell2026:ca.sell2026,
-      qty24:ca.qty24, rev24:ca.rev24, prf24:ca.prf24, price24, cost24, ads24:ca.ads24, pct24, ret24:ca.ret24,
-      qty25:ca.qty25, rev25:ca.rev25, prf25:ca.prf25, price25, cost25, ads25:ca.ads25, pct25, ret25:ca.ret25,
-      m7_pct, ads_pct_25, has_ads: ca.ads25>0,
+      code:p.code, name:p.name, cat1:p.cat1, cat2:p.cat2, is_new,
+      qty25, rev25, pct25:h.pct25||0, ads25,
+      price25:h.price25||0, cost25:h.cost25||0,
+      order_qty:order26, qty26, rev26, prf26, pct26,
+      price26, cost26, ads26:ads_amt,
+      ads_pct_used, ads_flag,  // 'normal'|'capped'|'organic'|'price_warn'
+      gross_pct, cost_amt, delivery_amt, operator_amt, fixed_amt, tax_amt,
+      price_chg, cost_chg, m7_pct:h.m7_pct||0,
+      rev_growth: rev25>0?Math.round((rev26-rev25)/rev25*1000)/10:(rev26>0?100:0),
+      from_drive: p.order_qty>0,
     };
   });
-
-  const cats = Object.values(catYrAgg).map(c=>({
-    ...c, profit_pct: c.revenue>0?Math.round(c.profit/c.revenue*1000)/10:0
-  }));
-  const cat_ads_pct = {};
-  const catGroups = {};
-  Object.values(codeAgg).filter(c=>c.ads25>0&&c.rev25>0).forEach(c=>{
-    if(!catGroups[c.cat1]) catGroups[c.cat1]={ads:0,rev:0};
-    catGroups[c.cat1].ads+=c.ads25; catGroups[c.cat1].rev+=c.rev25;
-  });
-  Object.entries(catGroups).forEach(([k,v])=>{
-    cat_ads_pct[k]=Math.round(v.ads/v.rev*1000)/10;
-  });
-
-  Logger.log('Static: '+hist.length+' бараа, rev_2025='+Math.round(summary.rev_2025/1e6)+'M');
-  return { hist, cats, summary, cat_ads_pct, sheet2, updated: new Date().toISOString() };
 }
 
-// ══════════════════════════════════════════════
-// ACTUAL 2026 — Sheet1-н 2026 оны бодит дата
-// ══════════════════════════════════════════════
-function getActual2026() {
-  const ss  = SpreadsheetApp.getActiveSpreadsheet();
-  const sh1 = ss.getSheetByName('Sheet1');
-  const sh2 = ss.getSheetByName('Sheet2');
-  if (!sh1) return { error: 'Sheet1 олдсонгүй' };
 
-  const codeMap = {};
-  if (sh2) {
-    const s2 = sh2.getRange(2,1,sh2.getLastRow()-1,5).getValues();
-    s2.forEach(r => {
-      const c = (r[0]||'').toString().trim();
-      if (c) codeMap[c] = {
-        name: (r[1]||'').toString().trim(),
-        cat1: (r[2]||'').toString().trim(),
-        cat2: (r[3]||'').toString().trim(),
-        sell2026: (r[4]||'').toString().trim() === 'Тийм',
+function getCats(fc) {
+  const m={};
+
+  // 2025: HIST дахь БҮГД бараагаас ангиллаар нэгтгэнэ
+  HIST.forEach(h=>{
+    const c = h.cat1||'Бусад';
+    if(!m[c]) m[c]={rev25:0,prf25:0,cnt25:0, rev26:0,prf26:0,qty26:0,cnt:0};
+    if((h.qty25||0)>0){
+      m[c].rev25 += h.rev25||0;
+      m[c].prf25 += h.prf25||0;
+      m[c].cnt25++;
+    }
+  });
+
+  // 2026: FC (захиалсан бараанууд)-аас ангиллаар нэгтгэнэ
+  fc.forEach(r=>{
+    const c = r.cat1||'Бусад';
+    if(!m[c]) m[c]={rev25:0,prf25:0,cnt25:0, rev26:0,prf26:0,qty26:0,cnt:0};
+    m[c].rev26 += r.rev26;
+    m[c].prf26 += r.prf26;
+    m[c].qty26 += r.qty26;
+    m[c].cnt++;
+  });
+
+  return Object.entries(m)
+    .filter(([,v])=>v.rev25>0||v.rev26>0)
+    .sort((a,b)=>b[1].rev26-a[1].rev26)
+    .map(([n,v])=>({
+      name:n, ...v,
+      pct25: v.rev25>0?Math.round(v.prf25/v.rev25*1000)/10:0,
+      pct26: v.rev26>0?Math.round(v.prf26/v.rev26*1000)/10:0,
+    }));
+}
+
+// ══════════════════════════════════════
+// НИЙТ ДҮГНЭЛТ
+// ══════════════════════════════════════
+function renderOv() {
+  const fc = calcFC(20);
+  const rev26=fc.reduce((s,r)=>s+r.rev26,0);
+  const prf26=fc.reduce((s,r)=>s+r.prf26,0);
+  const ads26=fc.reduce((s,r)=>s+r.ads26,0);
+  const qty26=fc.reduce((s,r)=>s+r.qty26,0);
+  const s25=SUM;
+  // Орлогын % өсөлт — 2025-аас харьцуулна
+  const rev_qty_20 = Math.round(s25.rev_2025 * 1.2);  // +20% зорилт
+  const gr = (rev26 - s25.rev_2025) / s25.rev_2025 * 100;
+  const gp = (prf26 - s25.profit_2025) / s25.profit_2025 * 100;
+  const newCnt=(SHEET2.length>0?SHEET2:HIST.filter(h=>h.sell2026).map(h=>({is_new:false}))).filter(p=>p.is_new).length;
+  const warnCnt = fc.filter(r=>r.ads_flag==='price_warn').length;
+  const cappedCnt = fc.filter(r=>r.ads_flag==='capped').length;
+
+  document.getElementById('kp-ov').innerHTML=`
+    <div class="kpi b"><div class="kpi-lbl">2025 Нийт орлого (факт)</div>
+      <div class="kpi-val">${fmt(s25.rev_2025)}</div><div class="kpi-sub">суурь</div></div>
+    <div class="kpi g"><div class="kpi-lbl">2026 Прогноз орлого (+30%)</div>
+      <div class="kpi-val">${fmt(rev26)}</div>
+      <div class="kpi-sub"><span class="up">↑ +${gr.toFixed(1)}%</span></div></div>
+    <div class="kpi a"><div class="kpi-lbl">2026 Прогноз ашиг</div>
+      <div class="kpi-val">${fmt(prf26)}</div>
+      <div class="kpi-sub"><span class="up">↑ +${gp.toFixed(1)}%</span> ${rev26>0?Math.round(prf26/rev26*100):0}%</div></div>
+    <div class="kpi p"><div class="kpi-lbl">2026 Ads зардал санал</div>
+      <div class="kpi-val">${fmt(ads26)}</div>
+      <div class="kpi-sub">ROAS: ${ads26>0?(rev26/ads26).toFixed(1):0}x</div></div>
+    <div class="kpi b"><div class="kpi-lbl">2026-д зарах бараа</div>
+      <div class="kpi-val">${SUM.sell_items}</div>
+      <div class="kpi-sub"><span class="tg-n" style="font-size:10px;padding:1px 5px;border-radius:8px">${newCnt} шинэ</span></div></div>
+    <div class="kpi g"><div class="kpi-lbl">Нийт захиалга (2026)</div>
+      <div class="kpi-val">${fN(qty26)}</div><div class="kpi-sub">ширхэг</div></div>
+    ${warnCnt>0?`<div class="kpi r"><div class="kpi-lbl">⚠️ Үнэ нэмэх шаардлагатай</div>
+      <div class="kpi-val" style="color:#f87171">${warnCnt}</div>
+      <div class="kpi-sub">бараа (margin < 0%)</div></div>`:''}
+    ${cappedCnt>0?`<div class="kpi a"><div class="kpi-lbl">🟡 Ads cap хийгдсэн</div>
+      <div class="kpi-val" style="color:#fbbf24">${cappedCnt}</div>
+      <div class="kpi-sub">бараа (ads бууруулсан)</div></div>`:''}
+  `;
+
+  updGrowth(20);
+
+  const cats=getCats(fc);
+  const totRev=cats.reduce((s,c)=>s+c.rev26,0)||1;
+  setTimeout(()=>{
+    const pctLbls=cats.slice(0,10).map(c=>{
+      const p=Math.round(c.rev26/totRev*100);
+      return (c.name.length>7?c.name.slice(0,7)+'…':c.name)+(p>0?' ('+p+'%)':'');
+    });
+    bC('c-cat-prog',pctLbls,[
+      {label:'2025 факт',data:cats.slice(0,10).map(c=>c.rev25),backgroundColor:'#3b82f688',borderRadius:4},
+      {label:'2026 прогноз',data:cats.slice(0,10).map(c=>c.rev26),backgroundColor:'#10b98188',borderRadius:4},
+    ]);
+    bC('c-margin-comp',pctLbls,[
+      {label:'2025 ашиг%',data:cats.slice(0,10).map(c=>{
+        const h25=HIST.filter(h=>h.cat1===c.name);
+        const r25=h25.reduce((s,h)=>s+(h.rev25||0),0);
+        const p25=h25.reduce((s,h)=>s+(h.prf25||0),0);
+        return r25>0?Math.round(p25/r25*1000)/10:0;
+      }),backgroundColor:'#f59e0b88',borderRadius:4},
+      {label:'2026 прогноз',data:cats.slice(0,10).map(c=>c.rev26>0?Math.round(c.prf26/c.rev26*1000)/10:0),backgroundColor:'#10b98188',borderRadius:4},
+    ],{pct:true});
+    bC('c-mrev',['5-р сар','6-р сар','7-р сар','8-р сар'],[
+      {label:'2025 факт',data:[5,6,7,8].map(mo=>Math.round(SUM.rev_2025*(mo===7?.55:mo===6?.2:mo===5?.05:.2))),backgroundColor:'#3b82f666',borderRadius:4,type:'bar'},
+      {label:'2026 прогноз',data:[5,6,7,8].map(mo=>Math.round(rev26*(mo===7?.55:mo===6?.2:mo===5?.05:.2))),borderColor:'#10b981',pointBackgroundColor:'#10b981',tension:.4,fill:false,type:'line'},
+    ]);
+  },80);
+}
+
+function updGrowth(v) {
+  document.getElementById('sl-v').textContent='+'+v+'%';
+  const fc = calcFC(parseInt(v));
+  const s25 = SUM;
+  // Бодит прогноз: price26 × qty26 (Sheet2-н үнэтэй)
+  const rev_actual = fc.reduce((s,r)=>s+r.rev26,0);
+  const prf_actual = fc.reduce((s,r)=>s+r.prf26,0);
+  const ads_actual = fc.reduce((s,r)=>s+r.ads26,0);
+  // Зөвхөн QTY өсөлтийн зорилт: rev25 × (1 + v/100)
+  const rev_qty_target = Math.round(s25.rev_2025 * (1 + parseInt(v)/100));
+  const prf_qty_target = Math.round(s25.profit_2025 * (1 + parseInt(v)/100));
+  // Үнийн өсөлтийн нөлөө
+  const price_effect = rev_actual - rev_qty_target;
+  document.getElementById('growth-cards').innerHTML=`
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div style="background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.2);border-radius:9px;padding:11px">
+          <div style="font-size:10px;color:var(--mut);margin-bottom:3px">2026 ОРЛОГО (ПРОГНОЗ)</div>
+          <div style="font-size:19px;font-weight:700;color:#60a5fa">${fmt(rev_actual)}</div>
+          <div style="font-size:11px;color:var(--mut2);margin-top:2px">
+            Захиалга +${v}% → ${fmt(rev_qty_target)}
+            ${price_effect!==0?'<br>Үнийн нөлөө: <span style="color:'+(price_effect>0?'#34d399':'#f87171')+'">'+(price_effect>0?'+':'')+fmt(price_effect)+'</span>':''}
+          </div>
+        </div>
+        <div style="background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.2);border-radius:9px;padding:11px">
+          <div style="font-size:10px;color:var(--mut);margin-bottom:3px">2026 АШИГ (ПРОГНОЗ)</div>
+          <div style="font-size:19px;font-weight:700;color:#34d399">${fmt(prf_actual)}</div>
+          <div style="font-size:11px;color:var(--mut2);margin-top:2px">
+            ${rev_actual>0?Math.round(prf_actual/rev_actual*100):0}% margin | Ads: ${fmt(ads_actual)}
+          </div>
+        </div>
+      </div>
+      <div style="background:var(--sur2);border:1px solid var(--brd);border-radius:8px;padding:10px;font-size:11px;color:var(--mut2)">
+        💡 Slider нь <b style="color:var(--txt)">захиалгын тоог</b> +${v}% өсгөнө.
+        Орлогын зорилт зөвхөн тоон өсөлтөөс: <span style="color:#60a5fa;font-weight:600">${fmt(rev_qty_target)}</span>
+        ${price_effect!==0?' | Үнэ өөрчлөгдсөн учир нэмэлт <span style="color:#34d399">+'+fmt(Math.abs(price_effect))+'</span>':''}
+      </div>
+    </div>`;
+}
+
+// ══════════════════════════════════════
+// 2026 ПРОГНОЗ
+// ══════════════════════════════════════
+let fcCat='all';
+function renderFc() {
+  FC=calcFC(20);
+  const cats=[...new Set(FC.map(r=>r.cat1).filter(Boolean))].sort();
+  const cf=document.getElementById('fc-cf');
+  if(!cf.children.length) {
+    cf.innerHTML=`<button class="fb active" onclick="setFcCat('all',this)">Бүгд</button>`+
+      cats.map(c=>`<button class="fb" onclick="setFcCat('${c}',this)">${c}</button>`).join('');
+  }
+  updForecast(20);
+}
+function setFcCat(c,btn){fcCat=c;document.querySelectorAll('#fc-cf .fb').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderFcTbl();}
+function updForecast(v){
+  document.getElementById('sl-fc-v').textContent='+'+v+'%';
+  FC=calcFC(parseInt(v));
+  const rev=FC.reduce((s,r)=>s+r.rev26,0);
+  const prf=FC.reduce((s,r)=>s+r.prf26,0);
+  const qty=FC.reduce((s,r)=>s+r.qty26,0);
+  const ads=FC.reduce((s,r)=>s+r.ads26,0);
+  document.getElementById('kp-fc').innerHTML=`
+    <div class="kpi b"><div class="kpi-lbl">2026 Нийт орлого</div><div class="kpi-val">${fmt(rev)}</div></div>
+    <div class="kpi g"><div class="kpi-lbl">2026 Нийт ашиг</div><div class="kpi-val">${fmt(prf)}</div><div class="kpi-sub">${rev>0?Math.round(prf/rev*100):0}% margin</div></div>
+    <div class="kpi a"><div class="kpi-lbl">2026 Ads санал</div><div class="kpi-val">${fmt(ads)}</div><div class="kpi-sub">ROAS: ${ads>0?(rev/ads).toFixed(1):0}x</div></div>
+    <div class="kpi p"><div class="kpi-lbl">Нийт захиалга</div><div class="kpi-val">${fN(qty)}</div></div>`;
+  renderFcTbl();
+}
+function renderFcTbl(){
+  const srch=(document.getElementById('fc-srch').value||'').toLowerCase();
+  const srt=document.getElementById('fc-srt').value;
+  const newOnly=document.getElementById('fc-new-only').checked;
+  let data=[...FC].filter(r=>(fcCat==='all'||r.cat1===fcCat)&&(!newOnly||r.is_new)&&((r.name||'').toLowerCase().includes(srch)));
+  data.sort((a,b)=>b[srt]-a[srt]);
+  document.getElementById('fc-tbl').innerHTML=`<thead><tr>
+    <th>#</th><th>Код</th><th>Нэр</th><th>Ангилал</th>
+    <th class="num">2025 борл(ш)</th><th class="num">2025 орлого</th><th class="num">2025 ашиг%</th>
+    <th class="num">2026 захиалга(ш)</th><th class="num">2026 орлого</th><th class="num">2026 ашиг%</th>
+    <th class="num">Өсөлт%</th><th class="num">2026 Ads</th><th>Төлөв</th>
+  </tr></thead><tbody>`+
+  data.map((r,i)=>`<tr>
+    <td><span class="rk ${i<3?'r'+(i+1):'rn'}">${i+1}</span></td>
+    <td><code style="font-size:10px;color:var(--mut2)">${r.code||'—'}</code></td>
+    <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;cursor:default" data-name="${r.name}">${r.name}${r.is_new?'<span class="new-badge">NEW</span>':''}</td>
+    <td><span class="tag tg-b">${r.cat1||'—'}</span></td>
+    <td class="num">${fN(r.qty25)}</td>
+    <td class="num">${r.rev25>0?fmt(r.rev25):'—'}</td>
+    <td class="num" style="color:${r.pct25>15?'#34d399':r.pct25>8?'#fbbf24':'#f87171'}">${r.rev25>0?r.pct25.toFixed(1)+'%':'—'}</td>
+    <td class="num" style="color:#60a5fa;font-weight:600">${fN(r.qty26)}</td>
+    <td class="num" style="color:#34d399">${fmt(r.rev26)}</td>
+    <td class="num" style="color:${r.pct26>15?'#34d399':r.pct26>8?'#fbbf24':'#f87171'}">${r.pct26.toFixed(1)}%</td>
+    <td class="num" style="color:${r.rev_growth>0?'#34d399':'#f87171'}">${r.rev_growth>0?'+':''}${r.rev_growth.toFixed(1)}%</td>
+    <td class="num">${fmt(r.ads26)}</td>
+  </tr>`).join('')+`</tbody>
+  <tfoot><tr style="position:sticky;bottom:0;background:var(--sur2);border-top:2px solid var(--brd);font-weight:700">
+    <td colspan="4" style="text-align:left;padding:6px 10px;color:var(--mut2);font-size:11px">Нийт ${data.length} бараа</td>
+    <td class="num">${fN(data.reduce((s,r)=>s+r.qty25,0))}</td>
+    <td class="num">${fmt(data.reduce((s,r)=>s+r.rev25,0))}</td>
+    <td class="num">—</td>
+    <td class="num">${fN(data.reduce((s,r)=>s+r.qty26,0))}</td>
+    <td class="num">${fmt(data.reduce((s,r)=>s+r.rev26,0))}</td>
+    <td class="num">${(()=>{const tv=data.reduce((s,r)=>s+r.rev26,0),tp=data.reduce((s,r)=>s+r.prf26,0);return tv>0?Math.round(tp/tv*10)/10+'%':'—'})()}</td>
+    <td class="num">—</td>
+    <td class="num">${fmt(data.reduce((s,r)=>s+r.ads26,0))}</td>
+    <td>—</td>
+  </tr></tfoot>`;
+}
+
+// ══════════════════════════════════════
+// ЗАХИАЛГЫН ТООЦОО
+// ══════════════════════════════════════
+let ordG=20,ordCat='all';
+function renderOrd(){
+  const cats=[...new Set((calcFC(20)).map(r=>r.cat1).filter(Boolean))].sort();
+  const cf=document.getElementById('ord-cf');
+  if(!cf.children.length){
+    cf.innerHTML=`<button class="fb active" onclick="setOrdCat('all',this)">Бүгд</button>`+
+      cats.map(c=>`<button class="fb" onclick="setOrdCat('${c}',this)">${c}</button>`).join('');
+    // Drive/Тооцоо шүүлтүүр
+    const sf = document.getElementById('ord-source-f');
+    if(sf && !sf.children.length) {
+      sf.innerHTML = `
+        <button class="fb active" onclick="setOrdSource('all',this)">📋+🔢 Бүгд</button>
+        <button class="fb" onclick="setOrdSource('drive',this)">📋 Drive</button>
+        <button class="fb" onclick="setOrdSource('calc',this)">🔢 Тооцоо</button>`;
+    }
+  }
+  updOrd(20);
+}
+let ordSource='all';
+function setOrdSource(s,btn){
+  ordSource=s;
+  document.querySelectorAll('#ord-source-f .fb').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderOrdTbl();
+}
+function setOrdCat(c,btn){ordCat=c;document.querySelectorAll('#ord-cf .fb').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderOrdTbl();}
+function updOrd(v){
+  ordG=parseInt(v);
+  document.getElementById('sl-ord-v').textContent='+'+v+'%';
+  document.getElementById('ord-ttl').textContent=`Захиалгын тооцоо (+${v}% зорилт)`;
+  const fc=calcFC(v);
+  const tot=fc.reduce((s,r)=>s+r.qty26,0);
+  const rev=fc.reduce((s,r)=>s+r.rev26,0);
+  const prf=fc.reduce((s,r)=>s+r.prf26,0);
+  document.getElementById('kp-ord').innerHTML=`
+    <div class="kpi b"><div class="kpi-lbl">Нийт захиалга</div><div class="kpi-val">${fN(tot)}</div></div>
+    <div class="kpi g"><div class="kpi-lbl">Тооцоолсон орлого</div><div class="kpi-val">${fmt(rev)}</div></div>
+    <div class="kpi a"><div class="kpi-lbl">Тооцоолсон ашиг</div><div class="kpi-val">${fmt(prf)}</div><div class="kpi-sub">${rev>0?Math.round(prf/rev*100):0}%</div></div>
+    <div class="kpi p"><div class="kpi-lbl">Шинэ бараа</div><div class="kpi-val">${SHEET2.filter(p=>p.is_new).length}</div></div>
+    <div class="kpi g"><div class="kpi-lbl">📋 Drive-аас</div>
+      <div class="kpi-val">${fc.filter(r=>r.from_drive).length}</div>
+      <div class="kpi-sub">захиалга баталгаажсан</div></div>
+    <div class="kpi b"><div class="kpi-lbl">🔢 Тооцоолсон</div>
+      <div class="kpi-val">${fc.filter(r=>!r.from_drive).length}</div>
+      <div class="kpi-sub">санал болгосон</div></div>`;
+  renderOrdTbl();
+}
+function renderOrdTbl(){
+  const srch=(document.getElementById('ord-srch').value||'').toLowerCase();
+  const fc=calcFC(ordG);
+  let data=fc.filter(r=>
+    (ordCat==='all'||r.cat1===ordCat)&&
+    (ordSource==='all'||(ordSource==='drive'&&r.from_drive)||(ordSource==='calc'&&!r.from_drive))&&
+    ((r.name||'').toLowerCase().includes(srch)));
+  data.sort((a,b)=>b.rev26-a.rev26);
+  document.getElementById('ord-tbl').innerHTML=`<thead><tr>
+    <th>#</th><th>Код</th><th>Нэр</th><th>Ангилал</th>
+    <th class="num">2025 борл(ш)</th><th class="num">2026 захиалга(ш)</th>
+    <th class="num">Шинэ өртөг</th><th class="num">Шинэ үнэ</th><th class="num">Margin%</th>
+    <th class="num">Тооц.орлого</th><th class="num">Тооц.ашиг</th>
+    <th class="num">Ads санал</th><th class="num">ROAS</th><th>Төлөв</th>
+  </tr></thead><tbody>`+
+  data.map((r,i)=>`<tr>
+    <td><span class="rk rn">${i+1}</span></td>
+    <td><code style="font-size:10px;color:var(--mut2)">${r.code||'—'}</code></td>
+    <td style="max-width:145px;overflow:hidden;text-overflow:ellipsis;cursor:default" data-name="${r.name}">${r.name}${r.is_new?'<span class="new-badge">NEW</span>':''}</td>
+    <td><span class="tag tg-b">${r.cat1||'—'}</span></td>
+    <td class="num">${fN(r.qty25)}</td>
+    <td class="num" style="color:#60a5fa;font-weight:600">${fN(r.qty26)}</td>
+    <td class="num">${r.cost26>0?fmt(r.cost26):'—'}</td>
+    <td class="num">${r.price26>0?fmt(r.price26):'—'}</td>
+    <td class="num" style="color:${r.pct26>15?'#34d399':r.pct26>8?'#fbbf24':'#f87171'}">${r.pct26.toFixed(1)}%</td>
+    <td class="num" style="color:#34d399">${fmt(r.rev26)}</td>
+    <td class="num" style="color:${r.prf26>0?'#34d399':'#f87171'}">${fmt(r.prf26)}</td>
+    <td class="num" style="color:#f59e0b">${r.ads26>0?fmt(r.ads26):'—'}</td>
+    <td class="num">${r.ads26>0?(r.rev26/r.ads26).toFixed(1)+'x':'—'}</td>
+    <td>${
+      r.ads_flag==='price_warn'  ? '<span class="tag tg-r">🔴 Үнэ нэм</span>' :
+      r.ads_flag==='capped'      ? '<span class="tag tg-a">🟡 Ads cap</span>' :
+      r.ads_flag==='new_product' ? '<span class="tag tg-p">🆕 Шинэ</span>' :
+      r.ads_flag==='low_volume'  ? '<span class="tag tg-b">📊 Ангилал avg</span>' :
+      r.ads_flag==='organic'     ? '<span class="tag tg-g">🟢 Органик</span>' : ''
+    }</td>
+  </tr>`).join('')+`</tbody>
+  <tfoot><tr style="position:sticky;bottom:0;background:var(--sur2);border-top:2px solid var(--brd);font-weight:700">
+    <td colspan="4" style="text-align:left;padding:6px 10px;color:var(--mut2);font-size:11px">Нийт ${fc.length} бараа</td>
+    <td class="num">${fN(fc.reduce((s,r)=>s+r.qty25,0))}</td>
+    <td class="num">${fN(fc.reduce((s,r)=>s+r.qty26,0))}</td>
+    <td class="num">—</td>
+    <td class="num">—</td>
+    <td class="num">—</td>
+    <td class="num">${fmt(fc.reduce((s,r)=>s+r.rev26,0))}</td>
+    <td class="num" style="color:#34d399">${fmt(fc.reduce((s,r)=>s+r.prf26,0))}</td>
+    <td class="num" style="color:#f59e0b">${fmt(fc.reduce((s,r)=>s+r.ads26,0))}</td>
+    <td class="num">${fc.reduce((s,r)=>s+r.ads26,0)>0?(fc.reduce((s,r)=>s+r.rev26,0)/fc.reduce((s,r)=>s+r.ads26,0)).toFixed(1)+'x':'—'}</td>
+    <td>—</td>
+  </tr></tfoot>`;
+}
+
+// ══════════════════════════════════════
+// АНГИЛАЛ
+// ══════════════════════════════════════
+function renderCat(){
+  const fc=calcFC(20);
+  const cats=getCats(fc);
+  const tRev26=cats.reduce((s,c)=>s+c.rev26,0)||1;
+  const tRev25=cats.reduce((s,c)=>s+c.rev25,0)||1;
+  document.getElementById('kp-cat').innerHTML=cats.slice(0,5).map((c,i)=>`
+    <div class="kpi ${['b','g','a','p','b'][i]}">
+      <div class="kpi-lbl" title="${c.name}">${c.name.length>14?c.name.slice(0,14)+'…':c.name}</div>
+      <div class="kpi-val" style="font-size:16px">${fmt(c.rev26)}</div>
+      <div class="kpi-sub">${c.rev25>0?'<span class="up">↑ +'+Math.round((c.rev26-c.rev25)/c.rev25*100)+'%</span>':''}
+      <span class="neu" style="margin-left:3px">${Math.round(c.rev26/tRev26*100)}%</span> ${c.cnt} нэр</div>
+    </div>`).join('');
+  setTimeout(()=>{
+    const cL=cats.map(c=>{const p=Math.round(c.rev26/tRev26*100);return (c.name.length>8?c.name.slice(0,8)+'…':c.name)+(p>0?' ('+p+'%)':'');});
+    bC('c-cat-bar',cL,[
+      {label:'2025 факт',data:cats.map(c=>c.rev25),backgroundColor:'#3b82f688',borderRadius:4},
+      {label:'2026 прогноз',data:cats.map(c=>c.rev26),backgroundColor:'#10b98188',borderRadius:4},
+    ]);
+    bC('c-cat-prf',cL,[
+      {label:'2026 Ашиг%',data:cats.map(c=>c.rev26>0?Math.round(c.prf26/c.rev26*1000)/10:0),
+       backgroundColor:cats.map(c=>c.rev26>0&&c.prf26/c.rev26>0.15?'#10b98188':'#f59e0b88'),borderRadius:4},
+    ],{pct:true});
+  },80);
+  setTimeout(initCat2Filters, 100);
+  document.getElementById('cat-tbl').innerHTML=`<thead><tr>
+    <th>#</th><th>Ангилал</th>
+    <th class="num">2025 нэр</th><th class="num">2025 орлого</th><th class="num">2025 хувь%</th><th class="num">2025 ашиг%</th>
+    <th class="num">2026 нэр</th><th class="num">2026 орлого</th><th class="num">2026 хувь%</th><th class="num">2026 ашиг%</th>
+    <th class="num">Өсөлт%</th>
+  </tr></thead><tbody>`+
+  cats.map((c,i)=>{
+    const gr  = c.rev25>0?Math.round((c.rev26-c.rev25)/c.rev25*1000)/10:null;
+    const p25 = Math.round(c.rev25/tRev25*1000)/10;
+    const p26 = Math.round(c.rev26/tRev26*1000)/10;
+    const col25 = c.pct25>15?'#34d399':c.pct25>8?'#fbbf24':'#f87171';
+    const col26 = c.pct26>15?'#34d399':c.pct26>8?'#fbbf24':'#f87171';
+    return `<tr>
+      <td><span class="rk ${i<3?'r'+(i+1):'rn'}">${i+1}</span></td>
+      <td><span class="tag tg-b" title="${c.name}">${c.name.length>16?c.name.slice(0,16)+'…':c.name}</span></td>
+      <td class="num">${c.cnt25||c.cnt}</td>
+      <td class="num">${fmt(c.rev25)}</td>
+      <td class="num"><div class="pct-bar"><div class="pct-fill" style="width:${Math.min(p25,100)}%"></div><span>${p25}%</span></div></td>
+      <td class="num" style="color:${col25}">${c.pct25.toFixed(1)}%</td>
+      <td class="num">${c.cnt}</td>
+      <td class="num" style="color:#34d399">${fmt(c.rev26)}</td>
+      <td class="num"><div class="pct-bar"><div class="pct-fill" style="width:${Math.min(p26,100)}%;background:#10b981"></div><span>${p26}%</span></div></td>
+      <td class="num" style="color:${col26}">${c.pct26.toFixed(1)}%</td>
+      <td class="num" style="color:${gr===null?'var(--mut)':gr>0?'#34d399':'#f87171'}">${gr===null?'—':gr>0?'+'+gr+'%':gr+'%'}</td>
+    </tr>`;
+  }).join('')+'</tbody>';
+}
+
+// ══════════════════════════════════════
+// ДЭД АНГИЛЛЫН ШИНЖИЛГЭЭ
+// ══════════════════════════════════════
+let selCat2Parent = null;
+
+function initCat2Filters() {
+  const cats = [...new Set(HIST.map(h=>h.cat1).filter(Boolean))].sort();
+  const wrap = document.getElementById('cat2-filter-wrap');
+  if (!wrap || wrap.children.length) return;
+  wrap.innerHTML = cats.map(c =>
+    `<button class="fb${c===cats[0]?' active':''}" onclick="renderCat2('${c.replace(/'/g,"\'+")}',this)">${c}</button>`
+  ).join('');
+  selCat2Parent = cats[0];
+  renderCat2(cats[0], wrap.children[0]);
+}
+
+function renderCat2(cat1, btn) {
+  selCat2Parent = cat1;
+  document.querySelectorAll('#cat2-filter-wrap .fb').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+
+  // Тухайн ангилалын дэд ангиллуудыг HIST-аас авна
+  const items = HIST.filter(h=>h.cat1===cat1 && h.sell2026);
+  const cat2Map = {};
+  items.forEach(h => {
+    const c2 = h.cat2 || 'Бусад';
+    if(!cat2Map[c2]) cat2Map[c2] = {rev24:0,rev25:0,prf24:0,prf25:0,qty24:0,qty25:0,cnt:0};
+    cat2Map[c2].rev24 += h.rev24||0;
+    cat2Map[c2].rev25 += h.rev25||0;
+    cat2Map[c2].prf24 += h.prf24||0;
+    cat2Map[c2].prf25 += h.prf25||0;
+    cat2Map[c2].qty24 += h.qty24||0;
+    cat2Map[c2].qty25 += h.qty25||0;
+    cat2Map[c2].cnt++;
+  });
+  const cats2 = Object.entries(cat2Map).sort((a,b)=>b[1].rev25-a[1].rev25);
+  const fc = calcFC(20);
+  const fc_cat = fc.filter(r=>r.cat1===cat1);
+
+  // FC-аас дэд ангиллын прогноз
+  const cat2Fc = {};
+  fc_cat.forEach(r => {
+    const c2 = (HIST.find(h=>h.code===r.code)||{}).cat2 || r.cat2 || 'Бусад';
+    if(!cat2Fc[c2]) cat2Fc[c2] = {rev26:0,prf26:0,qty26:0};
+    cat2Fc[c2].rev26 += r.rev26||0;
+    cat2Fc[c2].prf26 += r.prf26||0;
+    cat2Fc[c2].qty26 += r.qty26||0;
+  });
+
+  document.getElementById('cat2-rev-ttl').textContent = cat1 + ' — Дэд ангиллын орлого';
+  document.getElementById('cat2-prf-ttl').textContent = cat1 + ' — Дэд ангиллын ашиг%';
+
+  const labels = cats2.map(([n])=>n.length>10?n.slice(0,10)+'…':n);
+  const tRev25 = cats2.reduce((s,[,v])=>s+v.rev25,0)||1;
+  const pctLbls = cats2.map(([n,v])=>{
+    const p=Math.round(v.rev25/tRev25*100);
+    return (n.length>8?n.slice(0,8)+'…':n)+(p>0?' ('+p+'%)':'');
+  });
+
+  setTimeout(()=>{
+    bC('c-cat2-rev', pctLbls, [
+      {label:'2024',data:cats2.map(([,v])=>v.rev24),backgroundColor:'#3b82f688',borderRadius:4},
+      {label:'2025',data:cats2.map(([,v])=>v.rev25),backgroundColor:'#10b98188',borderRadius:4},
+      {label:'2026 прогноз',data:cats2.map(([n])=>(cat2Fc[n]||{}).rev26||0),backgroundColor:'#f59e0b88',borderRadius:4},
+    ]);
+    const prf25 = cats2.map(([,v])=>v.rev25>0?Math.round(v.prf25/v.rev25*1000)/10:0);
+    const prf26 = cats2.map(([n])=>{
+      const fc2=cat2Fc[n]||{};
+      return fc2.rev26>0?Math.round(fc2.prf26/fc2.rev26*1000)/10:0;
+    });
+    bC('c-cat2-prf', pctLbls, [
+      {label:'2025 ашиг%',data:prf25,backgroundColor:'#f59e0b88',borderRadius:4},
+      {label:'2026 прогноз',data:prf26,backgroundColor:'#10b98188',borderRadius:4},
+    ],{pct:true});
+  },80);
+
+  const totRev25=tRev25;
+  const totRev26=cats2.reduce((s,[n])=>s+(cat2Fc[n]||{}).rev26||0,0)||1;
+  document.getElementById('cat2-tbl').innerHTML=`<thead><tr>
+    <th>#</th><th>Дэд ангилал</th><th class="num">Нэр төрөл</th>
+    <th class="num">2024 орлого</th><th class="num">2025 орлого</th><th class="num">2025 хувь%</th>
+    <th class="num">2025 ашиг%</th><th class="num">2026 прогноз</th><th class="num">2026 хувь%</th>
+    <th class="num">Өсөлт%</th>
+  </tr></thead><tbody>`+
+  cats2.map(([n,v],i)=>{
+    const fc2=cat2Fc[n]||{rev26:0,prf26:0};
+    const p25=Math.round(v.rev25/totRev25*1000)/10;
+    const p26=Math.round(fc2.rev26/totRev26*1000)/10;
+    const gr=v.rev25>0?Math.round((fc2.rev26-v.rev25)/v.rev25*1000)/10:null;
+    const pct25=v.rev25>0?Math.round(v.prf25/v.rev25*1000)/10:0;
+    return `<tr>
+      <td><span class="rk ${i<3?'r'+(i+1):'rn'}">${i+1}</span></td>
+      <td><span class="tag tg-p" title="${n}">${n.length>16?n.slice(0,16)+'…':n}</span></td>
+      <td class="num">${v.cnt}</td>
+      <td class="num">${fmt(v.rev24)}</td>
+      <td class="num">${fmt(v.rev25)}</td>
+      <td class="num"><div class="pct-bar"><div class="pct-fill" style="width:${Math.min(p25,100)}%"></div><span>${p25}%</span></div></td>
+      <td class="num" style="color:${pct25>15?'#34d399':pct25>8?'#fbbf24':'#f87171'}">${pct25.toFixed(1)}%</td>
+      <td class="num" style="color:#34d399">${fmt(fc2.rev26)}</td>
+      <td class="num"><div class="pct-bar"><div class="pct-fill" style="width:${Math.min(p26,100)}%;background:#10b981"></div><span>${p26}%</span></div></td>
+      <td class="num" style="color:${gr===null?'var(--mut)':gr>0?'#34d399':'#f87171'}">${gr===null?'—':gr>0?'+'+gr+'%':gr+'%'}</td>
+    </tr>`;
+  }).join('')+'</tbody>';
+}
+
+// ══════════════════════════════════════
+// ҮНЭ/ӨРТГИЙН ӨӨРЧЛӨЛТ
+// ══════════════════════════════════════
+function renderPrice(){
+  const fc=calcFC(20);
+  const changed=fc.filter(r=>r.price_chg!==0||r.cost_chg!==0||r.is_new);
+  const avg_pc=changed.length?Math.round(changed.reduce((s,r)=>s+r.price_chg,0)/changed.length*10)/10:0;
+  const avg_cc=changed.length?Math.round(changed.reduce((s,r)=>s+r.cost_chg,0)/changed.length*10)/10:0;
+  document.getElementById('kp-price').innerHTML=`
+    <div class="kpi a"><div class="kpi-lbl">Дундаж үнийн өөрчлөлт</div>
+      <div class="kpi-val">${avg_pc>0?'+':''}${avg_pc}%</div><div class="kpi-sub">2025→2026</div></div>
+    <div class="kpi r"><div class="kpi-lbl">Дундаж өртгийн өөрчлөлт</div>
+      <div class="kpi-val">${avg_cc>0?'+':''}${avg_cc}%</div><div class="kpi-sub">Валют, тээвэр нэмэгдсэн</div></div>
+    <div class="kpi g"><div class="kpi-lbl">Шинэ бараа</div>
+      <div class="kpi-val">${fc.filter(r=>r.is_new).length}</div></div>
+    <div class="kpi b"><div class="kpi-lbl">Өртөг/үнэ өөрчлөгдсөн</div>
+      <div class="kpi-val">${changed.length}</div></div>`;
+  const top15=changed.slice(0,15);
+  setTimeout(()=>{
+    bC('c-price-chg',top15.map(r=>r.name.length>9?r.name.slice(0,9)+'…':r.name),[
+      {label:'Үнийн өөрчлөлт%',data:top15.map(r=>r.price_chg),
+       backgroundColor:top15.map(r=>r.price_chg>0?'#10b98188':'#ef444488'),borderRadius:4},
+    ],{pct:true});
+    bC('c-cost-chg',top15.map(r=>r.name.length>9?r.name.slice(0,9)+'…':r.name),[
+      {label:'Өртгийн өөрчлөлт%',data:top15.map(r=>r.cost_chg),
+       backgroundColor:top15.map(r=>r.cost_chg>0?'#ef444488':'#10b98188'),borderRadius:4},
+    ],{pct:true});
+  },80);
+  renderPriceTbl();
+  // Тооцоолуурын бараа сонгох жагсаалт
+  setTimeout(()=>{
+    const sel = document.getElementById('calc-prod');
+    if(sel && !sel.options.length) {
+      const fc = calcFC(20);
+      sel.innerHTML = '<option value="">— Бараа сонгоно уу —</option>' +
+        fc.sort((a,b)=>b.rev26-a.rev26).map(r=>
+          `<option value="${r.code}" data-cost="${r.cost26}" data-price="${r.price26}" data-qty="${r.qty26}">[${r.code}] ${r.name.slice(0,35)}</option>`
+        ).join('');
+    }
+  },100);
+}
+function renderPriceTbl(){
+  const srch=(document.getElementById('pr-srch').value||'').toLowerCase();
+  const fc=calcFC(20);
+  let data=fc.filter(r=>r.price26>0&&(r.name||'').toLowerCase().includes(srch));
+  data.sort((a,b)=>Math.abs(b.price_chg)-Math.abs(a.price_chg));
+  document.getElementById('pr-tbl').innerHTML=`<thead><tr>
+    <th>#</th><th>Код</th><th>Барааны нэр</th><th>Ангилал</th>
+    <th class="num">2025 өртөг</th><th class="num">2026 өртөг</th><th class="num">Өртгийн ∆%</th>
+    <th class="num">2025 үнэ</th><th class="num">2026 үнэ</th><th class="num">Үнийн ∆%</th>
+    <th class="num">2025 ашиг%</th><th class="num">2026 ашиг%</th>
+  </tr></thead><tbody>`+
+  data.map((r,i)=>`<tr>
+    <td><span class="rk rn">${i+1}</span></td>
+    <td><code style="font-size:10px;color:var(--mut2)">${r.code||'—'}</code></td>
+    <td style="max-width:135px;overflow:hidden;text-overflow:ellipsis;cursor:default" data-name="${r.name}">${r.name}${r.is_new?'<span class="new-badge">NEW</span>':''}</td>
+    <td><span class="tag tg-b">${r.cat1||'—'}</span></td>
+    <td class="num">${r.cost25>0?fmt(r.cost25):'—'}</td>
+    <td class="num">${r.cost26>0?fmt(r.cost26):'—'}</td>
+    <td class="num" style="color:${r.cost_chg>0?'#f87171':'#34d399'}">${r.cost25>0?(r.cost_chg>0?'+':'')+r.cost_chg+'%':'Шинэ'}</td>
+    <td class="num">${r.price25>0?fmt(r.price25):'—'}</td>
+    <td class="num">${r.price26>0?fmt(r.price26):'—'}</td>
+    <td class="num" style="color:${r.price_chg>0?'#34d399':'#f87171'}">${r.price25>0?(r.price_chg>0?'+':'')+r.price_chg+'%':'Шинэ'}</td>
+    <td class="num" style="color:${r.pct25>15?'#34d399':r.pct25>8?'#fbbf24':'#f87171'}">${r.rev25>0?r.pct25.toFixed(1)+'%':'—'}</td>
+    <td class="num" style="color:${r.pct26>15?'#34d399':r.pct26>8?'#fbbf24':'#f87171'}">${r.pct26.toFixed(1)}%</td>
+  </tr>`).join('')+'</tbody>';
+}
+
+// ══════════════════════════════════════
+// АШИГ ТООЦООЛУУР
+// ══════════════════════════════════════
+function onCalcProdChange() {
+  const sel = document.getElementById('calc-prod');
+  if (!sel || !sel.value) return;
+  const opt = sel.selectedOptions[0];
+  if (!opt) return;
+  // Бараа солигдох бүрт шинэ утгаар БҮРЭН дүүргэнэ
+  const autoCost  = parseFloat(opt.dataset.cost)  || 0;
+  const autoPrice = parseFloat(opt.dataset.price) || 0;
+  const autoQty   = parseFloat(opt.dataset.qty)   || 0;
+  if(autoCost)  document.getElementById('calc-cost').value  = autoCost;
+  if(autoPrice) document.getElementById('calc-price').value = autoPrice;
+  if(autoQty)   document.getElementById('calc-qty').value   = autoQty;
+  calcProfit();
+}
+
+function calcProfit() {
+  const sel   = document.getElementById('calc-prod');
+  const cost  = parseFloat(document.getElementById('calc-cost').value)  || 0;
+  const price = parseFloat(document.getElementById('calc-price').value) || 0;
+  const qty   = parseFloat(document.getElementById('calc-qty').value)   || 0;
+  const adsPct = parseFloat(document.getElementById('calc-ads-pct').value)||0;
+  const delPct = parseFloat(document.getElementById('calc-delivery').value)||0;
+  const opsPct = parseFloat(document.getElementById('calc-operator').value)||0;
+  const fixPct = parseFloat(document.getElementById('calc-fixed').value)||0;
+  const taxPct = parseFloat(document.getElementById('calc-tax')?.value)||0;
+
+  if(!price || !qty) {
+    document.getElementById('calc-result').innerHTML =
+      '<div style="color:var(--mut);font-size:12px;padding:10px">Үнэ болон тоог оруулна уу</div>';
+    return;
+  }
+
+  const totalRev     = price * qty;
+  const totalCost    = cost * qty;
+  const adsAmt=totalRev*adsPct/100;
+  const deliveryAmt=totalRev*delPct/100;
+  const operatorAmt=totalRev*opsPct/100;
+  const fixedAmt=totalRev*fixPct/100;
+  const taxAmt=totalRev*taxPct/100;
+  const totalExpense=totalCost+adsAmt+deliveryAmt+operatorAmt+fixedAmt+taxAmt;
+  const grossProfit=totalRev-totalCost;
+  const netProfit=totalRev-totalExpense;
+  const grossMargin=price>0?Math.round((price-cost)/price*1000)/10:0;
+  const netMargin=totalRev>0?Math.round(netProfit/totalRev*1000)/10:0;
+  const unitNetPrf=qty>0?netProfit/qty:0;
+  const roas=adsAmt>0?Math.round(totalRev/adsAmt*10)/10:0;
+
+  const card = (lbl,val,sub,color='var(--txt)') =>
+    `<div style="background:var(--sur2);border:1px solid var(--brd);border-radius:10px;padding:13px">
+      <div style="font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px">${lbl}</div>
+      <div style="font-size:19px;font-weight:700;color:${color}">${val}</div>
+      ${sub?`<div style="font-size:11px;color:var(--mut2);margin-top:3px">${sub}</div>`:''}
+    </div>`;
+
+  document.getElementById('calc-result').innerHTML =
+    card('Нийт орлого', fmt(totalRev), `${fN(qty)}ш × ${fmt(price)}`) +
+    card('Нийт өртөг', fmt(totalCost), `${fN(qty)}ш × ${fmt(cost)}`) +
+    card('Gross ашиг', fmt(grossProfit), `Gross margin: ${grossMargin}%`, grossProfit>0?'#34d399':'#f87171') +
+    card('Маркетинг/Ads', fmt(adsAmt), `Орлогын ${adsPct}% — ROAS: ${roas}x`) +
+    card('Хүргэлт', fmt(deliveryAmt), `Орлогын ${delPct}%`) +
+    card('Оператор', fmt(operatorAmt), `Орлогын ${opsPct}%`) +
+    card('Тогтмол зардал', fmt(fixedAmt), `Орлогын ${fixPct}%`) +
+    card('Нөат татвар', fmt(taxAmt), `Орлогын ${taxPct}%`) +
+    card('Нийт зардал', fmt(totalExpense), `Орлогын ${Math.round(totalExpense/totalRev*100)}%`) +
+    card('NET АШИГ', fmt(netProfit), `Net margin: ${netMargin}% | Нэгжид: ${fmt(unitNetPrf)}`,
+      netProfit>0?'#34d399':'#f87171');
+}
+
+// ══════════════════════════════════════
+// 2026-Д ЗАРАХГҮЙ
+// ══════════════════════════════════════
+let dropCat='all';
+function renderDrop(){
+  // Sheet2 ачаалагдсан бол HIST sell2026 дахин sync хийнэ
+  if (SHEET2.length > 0) {
+    const sellSet = new Set(SHEET2.filter(p=>p.sell2026).map(p=>p.code));
+    HIST.forEach(h => { h.sell2026 = sellSet.has(h.code); });
+  }
+  const drop=HIST.filter(h=>!h.sell2026);
+  const sold=drop.filter(h=>h.rev24>0||h.rev25>0);
+  const never=drop.filter(h=>h.rev24===0&&h.rev25===0);
+  const tot_rev=drop.reduce((s,h)=>s+(h.rev24||0)+(h.rev25||0),0);
+  const tot_prf=drop.reduce((s,h)=>s+(h.prf24||0)+(h.prf25||0),0);
+  const rev24=drop.reduce((s,h)=>s+(h.rev24||0),0);
+  const rev25=drop.reduce((s,h)=>s+(h.rev25||0),0);
+  const gr=rev24>0?(rev25-rev24)/rev24*100:0;
+  document.getElementById('kp-drop').innerHTML=`
+    <div class="kpi" style="border-top:3px solid #ef4444">
+      <div class="kpi-lbl">Нийт зарахгүй бараа</div>
+      <div class="kpi-val" style="color:#f87171">${drop.length}</div>
+      <div class="kpi-sub"><span class="dn">${never.length} огт зарагдаагүй</span></div></div>
+    <div class="kpi b"><div class="kpi-lbl">Зарагдсан байсан</div>
+      <div class="kpi-val">${sold.length}</div>
+      <div class="kpi-sub"><span class="neu">${Math.round(sold.length/drop.length*100)}%</span></div></div>
+    <div class="kpi a"><div class="kpi-lbl">2024+2025 нийт орлого</div>
+      <div class="kpi-val">${fmt(tot_rev)}</div>
+      <div class="kpi-sub">Ашиг: ${fmt(tot_prf)}</div></div>
+    <div class="kpi b"><div class="kpi-lbl">2024 орлого</div><div class="kpi-val">${fmt(rev24)}</div></div>
+    <div class="kpi" style="border-top:3px solid #34d399">
+      <div class="kpi-lbl">2025 орлого</div>
+      <div class="kpi-val" style="color:#34d399">${fmt(rev25)}</div>
+      <div class="kpi-sub"><span class="${gr>=0?'up':'dn'}">${gr>=0?'↑':'↓'}${Math.abs(gr).toFixed(1)}%</span></div></div>
+    <div class="kpi g"><div class="kpi-lbl">Дундаж ашиг%</div>
+      <div class="kpi-val">${tot_rev>0?Math.round(tot_prf/tot_rev*100):0}%</div></div>`;
+
+  const catMap={};
+  drop.forEach(h=>{const c=h.cat1||'Бусад';if(!catMap[c])catMap[c]={r24:0,r25:0};catMap[c].r24+=(h.rev24||0);catMap[c].r25+=(h.rev25||0);});
+  const cats=Object.entries(catMap).sort((a,b)=>b[1].r24+b[1].r25-a[1].r24-a[1].r25).slice(0,12);
+  setTimeout(()=>{
+    bC('c-drop-cat',cats.map(([n])=>n.length>7?n.slice(0,7)+'…':n),[
+      {label:'2024',data:cats.map(([,v])=>v.r24),backgroundColor:'#3b82f688',borderRadius:4},
+      {label:'2025',data:cats.map(([,v])=>v.r25),backgroundColor:'#ef444488',borderRadius:4},
+    ]);
+  },80);
+
+  const neg=sold.filter(h=>(h.pct25||0)<0).length;
+  const low=sold.filter(h=>(h.pct25||0)>=0&&(h.pct25||0)<10).length;
+  const ok=sold.filter(h=>(h.pct25||0)>=10).length;
+  const decl=sold.filter(h=>h.rev25<h.rev24*0.7&&h.rev24>0).length;
+  const totS=sold.length||1, totA=drop.length||1;
+  document.getElementById('drop-reason').innerHTML=`
+    <div style="display:flex;flex-direction:column;gap:7px">
+      ${[['Сөрөг ашигтай',neg,totS,'#ef4444'],['Ашиг < 10%',low,totS,'#f59e0b'],['2025-д >30% буурсан',decl,totS,'#8b5cf6'],['Ашиг ≥ 10% (сайн!)',ok,totS,'#10b981'],['Огт зарагдаагүй',never.length,totA,'#64748b']].map(([lbl,n,tot,clr])=>`
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="min-width:160px;font-size:11px;color:var(--mut2)">${lbl}</div>
+          <div style="flex:1;background:rgba(255,255,255,.05);border-radius:3px;height:16px">
+            <div style="width:${Math.round(n/tot*100)}%;background:${clr}88;height:100%;border-radius:3px;display:flex;align-items:center;padding-left:5px">
+              <span style="font-size:9px;color:${clr};font-weight:600">${n}</span>
+            </div>
+          </div>
+        </div>`).join('')}
+      <div style="font-size:11px;color:#fbbf24;margin-top:4px">⚠️ Ашиг≥10% байсан ${ok} бараа хасагдсан — дахин нягтлаарай!</div>
+    </div>`;
+
+  const allCats=[...new Set(drop.map(h=>h.cat1).filter(Boolean))].sort();
+  const cf=document.getElementById('drop-cf');
+  if(!cf.children.length){
+    cf.innerHTML=`<button class="fb active" onclick="setDropCat('all',this)">Бүгд</button>`+
+      allCats.map(c=>`<button class="fb" onclick="setDropCat('${c}',this)">${c}</button>`).join('');
+  }
+  renderDropTbl();
+}
+function setDropCat(c,btn){dropCat=c;document.querySelectorAll('#drop-cf .fb').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderDropTbl();}
+function renderDropTbl(){
+  const srch=(document.getElementById('drop-srch').value||'').toLowerCase();
+  const srt=document.getElementById('drop-srt').value;
+  const filt=document.getElementById('drop-filt').value;
+  let data=HIST.filter(h=>!h.sell2026).filter(h=>
+    (dropCat==='all'||h.cat1===dropCat)&&
+    (filt==='all'||(filt==='sold'&&(h.rev24>0||h.rev25>0))||(filt==='never'&&h.rev24===0&&h.rev25===0))&&
+    (h.name||'').toLowerCase().includes(srch)
+  ).map(h=>({...h,rev_tot:(h.rev24||0)+(h.rev25||0)}));
+  data.sort((a,b)=>b[srt]-a[srt]);
+  document.getElementById('drop-ttl').textContent=`2026-д зарахгүй бараанууд — ${data.length} бараа`;
+  document.getElementById('drop-tbl').innerHTML=`<thead><tr>
+    <th>#</th><th>Код</th><th>Барааны нэр</th><th>Ангилал1</th><th>Ангилал2</th>
+    <th class="num">2024 борл(ш)</th><th class="num">2024 орлого</th><th class="num">2024 ашиг%</th>
+    <th class="num">2025 борл(ш)</th><th class="num">2025 орлого</th><th class="num">2025 ашиг%</th>
+    <th class="num">Нийт орлого</th><th>Чиг</th><th>Статус</th>
+  </tr></thead><tbody>`+
+  data.map((h,i)=>{
+    const pct24=h.pct24||0,pct25=h.pct25||0;
+    const trnd=h.rev24>0?(h.rev25<h.rev24*0.7?'<span class="dn">↓ буурсан</span>':h.rev25>h.rev24*1.1?'<span class="up">↑ өссөн</span>':'<span class="neu">→ тогтвортой</span>'):'—';
+    const stat=!(h.rev24>0||h.rev25>0)?'<span class="tag" style="background:rgba(100,116,139,.15);color:#94a3b8">Огт зарагдаагүй</span>':
+      pct25<0?'<span class="tag tg-r">Алдагдалтай</span>':pct25<10?'<span class="tag tg-a">Margin бага</span>':'<span class="tag tg-g">Сайн margin</span>';
+    return `<tr>
+      <td><span class="rk rn">${i+1}</span></td>
+      <td><code style="font-size:10px;color:var(--mut2)">${h.code||'—'}</code></td>
+      <td style="max-width:145px;overflow:hidden;text-overflow:ellipsis;cursor:default" title="${h.name||''}">${h.name||''}</td>
+      <td><span class="tag tg-b">${h.cat1||'—'}</span></td>
+      <td><span class="tag tg-p">${h.cat2||'—'}</span></td>
+      <td class="num">${fN(h.qty24||0)}</td>
+      <td class="num">${h.rev24>0?fmt(h.rev24):'—'}</td>
+      <td class="num" style="color:${pct24>15?'#34d399':pct24>0?'#fbbf24':'#f87171'}">${h.rev24>0?pct24.toFixed(1)+'%':'—'}</td>
+      <td class="num">${fN(h.qty25||0)}</td>
+      <td class="num">${h.rev25>0?fmt(h.rev25):'—'}</td>
+      <td class="num" style="color:${pct25>15?'#34d399':pct25>0?'#fbbf24':'#f87171'}">${h.rev25>0?pct25.toFixed(1)+'%':'—'}</td>
+      <td class="num">${h.rev_tot>0?fmt(h.rev_tot):'—'}</td>
+      <td>${trnd}</td><td>${stat}</td>
+    </tr>`;
+  }).join('')+`</tbody>
+  <tfoot><tr style="position:sticky;bottom:0;background:var(--sur2);border-top:2px solid var(--brd);font-weight:700">
+    <td colspan="4" style="text-align:left;padding:6px 10px;color:var(--mut2);font-size:11px">
+      Нийт ${data.length} бараа
+    </td>
+    <td class="num">${fN(data.reduce((s,r)=>s+r.qty25,0))}</td>
+    <td class="num">${fN(data.reduce((s,r)=>s+r.qty26,0))}</td>
+    <td class="num">—</td>
+    <td class="num">—</td>
+    <td class="num">—</td>
+    <td class="num">${fmt(data.reduce((s,r)=>s+r.rev26,0))}</td>
+    <td class="num">${fmt(data.reduce((s,r)=>s+r.prf26,0))}</td>
+    <td class="num">${fmt(data.reduce((s,r)=>s+r.ads26,0))}</td>
+    <td class="num">${data.reduce((s,r)=>s+(r.ads26>0?r.rev26/r.ads26:0),0)/data.filter(r=>r.ads26>0).length>0?
+      (data.reduce((s,r)=>s+(r.ads26>0?r.rev26:0),0)/data.reduce((s,r)=>s+r.ads26,0)).toFixed(1)+'x':'—'}</td>
+    <td>—</td>
+  </tr></tfoot>`;
+}
+
+// ══════════════════════════════════════
+// МАРКЕТИНГ
+// ══════════════════════════════════════
+function renderMkt(){
+  const fc=calcFC(20);
+  const rev26=fc.reduce((s,r)=>s+r.rev26,0);
+  const ads26=fc.reduce((s,r)=>s+r.ads26,0);
+  const s25=SUM;
+  document.getElementById('kp-mkt').innerHTML=`
+    <div class="kpi b"><div class="kpi-lbl">2025 Ads нийт</div><div class="kpi-val">${fmt(s25.ads_2025)}</div><div class="kpi-sub">ROAS: ${(s25.rev_2025/s25.ads_2025).toFixed(1)}x</div></div>
+    <div class="kpi g"><div class="kpi-lbl">2026 Ads санал (+30%)</div><div class="kpi-val">${fmt(ads26)}</div><div class="kpi-sub">ROAS: ${ads26>0?(rev26/ads26).toFixed(1):0}x</div></div>
+    <div class="kpi a"><div class="kpi-lbl">7-р сар — жилийн ~55%</div><div class="kpi-val">${fmt(Math.round(rev26*.55))}</div></div>
+    <div class="kpi p"><div class="kpi-lbl">Хийлдэг майхан тренд</div><div class="kpi-val">🔥</div><div class="kpi-sub">Шинэ захиалга</div></div>`;
+  const cats=getCats(fc);
+  const top6=cats.slice(0,6);
+  const ads6h=top6.map(c=>HIST.filter(h=>h.cat1===c.name).reduce((s,h)=>s+(h.ads25||0),0));
+  setTimeout(()=>{
+    bC('c-ads',top6.map(c=>c.name.length>8?c.name.slice(0,8)+'…':c.name),[
+      {label:'2025 Ads',data:ads6h,backgroundColor:'#3b82f688',borderRadius:4},
+      {label:'2026 Ads санал',data:top6.map(c=>Math.round(c.rev26/(s25.rev_2025/s25.ads_2025))),backgroundColor:'#10b98188',borderRadius:4},
+    ]);
+    doughC('c-alloc',top6.map(c=>c.name),ads6h,CL);
+  },80);
+  const CAL=[
+    {w:'4/21–4/27',ph:'Бэлтгэл',l:'Контент бэлдэх, нөөц шалгах',c:'#64748b'},
+    {w:'4/28–5/4',ph:'Эхлэл',l:'Зуны аялал постууд — 5-р сар',c:'#3b82f6'},
+    {w:'5/5–5/11',ph:'Эхлэл',l:'Reel — хийлдэг майхан unboxing',c:'#3b82f6'},
+    {w:'5/12–5/18',ph:'Идэвхжүүлэлт',l:'Ads нэмэх — майхан, ширээ, гудас',c:'#10b981'},
+    {w:'5/19–5/25',ph:'Идэвхжүүлэлт',l:'Хийлдэг майхан онцлох кампань',c:'#10b981'},
+    {w:'5/26–6/1',ph:'Эрчимжүүлэлт',l:'Flash sale, early bird акция',c:'#f59e0b'},
+    {w:'6/2–6/8',ph:'Эрчимжүүлэлт',l:'Influencer, UGC контент',c:'#f59e0b'},
+    {w:'6/9–6/15',ph:'Оргил бэлтгэл',l:'7-р сарын кампань — Ads 2x',c:'#f97316'},
+    {w:'6/16–6/22',ph:'Оргил бэлтгэл',l:'Ads 2x — хийлдэг майхан фокус',c:'#f97316'},
+    {w:'6/23–6/29',ph:'ОРГИЛ',l:'🔥 Оргилын кампани — live, giveaway',c:'#ef4444'},
+    {w:'6/30–7/6',ph:'ОРГИЛ',l:'🔥 Хамгийн их ads — майхан, гудас',c:'#ef4444'},
+    {w:'7/7–7/13',ph:'ОРГИЛ',l:'🔥 Bundle deal: майхан+гудас+ширээ',c:'#ef4444'},
+    {w:'7/14–7/20',ph:'ОРГИЛ',l:'🔥 Last chance — urgency messaging',c:'#ef4444'},
+    {w:'7/21–7/27',ph:'Буурах',l:'Clearance sale эхлэх',c:'#8b5cf6'},
+    {w:'7/28–8/10',ph:'Буурах',l:'Сүүлчийн нөөц sale',c:'#8b5cf6'},
+    {w:'8/11–8/17',ph:'Дүгнэлт',l:'Үр дүн шинжилгээ, 2027 бэлтгэл',c:'#64748b'},
+  ];
+  document.getElementById('cal').innerHTML=CAL.map(r=>`<div class="ci">
+    <div class="ci-w">${r.w}</div>
+    <div class="ci-p" style="background:${r.c}22;color:${r.c};border:1px solid ${r.c}44">${r.ph}</div>
+    <div class="ci-l">${r.l}</div>
+  </div>`).join('');
+}
+
+// ══════════════════════════════════════
+// ӨНГӨРСӨН АНАЛИЗ
+// ══════════════════════════════════════
+let histYear='all', histCat='all';
+const MN={5:'5-р сар',6:'6-р сар',7:'7-р сар',8:'8-р сар'};
+const DOW={'Mon':'Даваа','Tue':'Мягмар','Wed':'Лхагва','Thu':'Пүрэв','Fri':'Баасан','Sat':'Бямба','Sun':'Ням'};
+
+function getHistData() {
+  // prod_ym-аас histYear-д тохирох дата шүүнэ
+  let rows = window.__HIST__.prod_ym;
+  if(histYear==='all') {
+    // Бараа×нийт — year×month-р нэгтгэнэ
+    const m={};
+    rows.forEach(r=>{
+      const k=r.code;
+      if(!m[k]) m[k]={code:r.code,name:r.name,cat1:r.cat1,cat2:r.cat2,sell2026:r.sell2026,
+        qty:0,rev:0,gross_qty:0,ret_qty:0,ret_rev:0,cost:0,delivery:0,operator:0,fixed:0,ads:0,bonus:0,profit:0};
+      m[k].qty+=r.qty;m[k].rev+=r.rev;m[k].gross_qty+=r.gross_qty;
+      m[k].ret_qty+=r.ret_qty;m[k].ret_rev+=r.ret_rev;
+      m[k].cost+=r.cost;m[k].delivery+=r.delivery;m[k].operator+=r.operator;
+      m[k].fixed+=r.fixed;m[k].ads+=r.ads;m[k].bonus+=r.bonus;m[k].profit+=r.profit;
+    });
+    return Object.values(m).map(r=>({...r,
+      profit_pct:r.rev>0?Math.round(r.profit/r.rev*1000)/10:0,
+      ret_pct:r.gross_qty>0?Math.round(r.ret_qty/r.gross_qty*1000)/10:0,
+      roas:r.ads>0?Math.round(r.rev/r.ads*10)/10:0,
+      total_cost:r.cost+r.delivery+r.operator+r.fixed+r.ads,
+      avg_price:r.qty>0?Math.round(r.rev/r.qty):0,
+    }));
+  } else if(typeof histYear==='number') {
+    // Тухайн жилийн бүх сарыг нэгтгэнэ
+    const filtered=rows.filter(r=>r.year===histYear);
+    const m={};
+    filtered.forEach(r=>{
+      const k=r.code;
+      if(!m[k]) m[k]={code:r.code,name:r.name,cat1:r.cat1,cat2:r.cat2,sell2026:r.sell2026,
+        qty:0,rev:0,gross_qty:0,ret_qty:0,ret_rev:0,cost:0,delivery:0,operator:0,fixed:0,ads:0,bonus:0,profit:0};
+      m[k].qty+=r.qty;m[k].rev+=r.rev;m[k].gross_qty+=r.gross_qty;
+      m[k].ret_qty+=r.ret_qty;m[k].ret_rev+=r.ret_rev;
+      m[k].cost+=r.cost;m[k].delivery+=r.delivery;m[k].operator+=r.operator;
+      m[k].fixed+=r.fixed;m[k].ads+=r.ads;m[k].bonus+=r.bonus;m[k].profit+=r.profit;
+    });
+    return Object.values(m).map(r=>({...r,
+      profit_pct:r.rev>0?Math.round(r.profit/r.rev*1000)/10:0,
+      ret_pct:r.gross_qty>0?Math.round(r.ret_qty/r.gross_qty*1000)/10:0,
+      roas:r.ads>0?Math.round(r.rev/r.ads*10)/10:0,
+      total_cost:r.cost+r.delivery+r.operator+r.fixed+r.ads,
+      avg_price:r.qty>0?Math.round(r.rev/r.qty):0,
+    }));
+  } else {
+    // Тухайн сарын хоёр жил
+    const mo=parseInt(histYear);
+    const filtered=rows.filter(r=>r.month===mo);
+    const m={};
+    filtered.forEach(r=>{
+      const k=r.code+'_'+r.year;
+      if(!m[k]) m[k]={code:r.code,name:r.name,cat1:r.cat1,cat2:r.cat2,sell2026:r.sell2026,year:r.year,
+        qty:0,rev:0,gross_qty:0,ret_qty:0,ret_rev:0,cost:0,delivery:0,operator:0,fixed:0,ads:0,bonus:0,profit:0};
+      m[k].qty+=r.qty;m[k].rev+=r.rev;m[k].gross_qty+=r.gross_qty;
+      m[k].ret_qty+=r.ret_qty;m[k].cost+=r.cost;m[k].delivery+=r.delivery;
+      m[k].operator+=r.operator;m[k].fixed+=r.fixed;m[k].ads+=r.ads;m[k].bonus+=r.bonus;m[k].profit+=r.profit;
+    });
+    return Object.values(m).map(r=>({...r,
+      profit_pct:r.rev>0?Math.round(r.profit/r.rev*1000)/10:0,
+      ret_pct:r.gross_qty>0?Math.round(r.ret_qty/r.gross_qty*1000)/10:0,
+      roas:r.ads>0?Math.round(r.rev/r.ads*10)/10:0,
+      total_cost:r.cost+r.delivery+r.operator+r.fixed+r.ads,
+      avg_price:r.qty>0?Math.round(r.rev/r.qty):0,
+    }));
+  }
+}
+
+function getHistMonths() {
+  const months=window.__HIST__.months;
+  if(histYear==='all') return months;
+  if(typeof histYear==='number') return months.filter(m=>m.year===histYear);
+  return months.filter(m=>m.month===parseInt(histYear));
+}
+
+function setHistYear(y,btn){
+  histYear=y;
+  document.querySelectorAll('#t-hist .fb').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  RENDERED['hist']=false; renderHist(); RENDERED['hist']=true;
+}
+
+function renderHist(){
+  if(!window.__HIST__ || !window.__HIST__.prod_ym) {
+    const el = document.getElementById('kp-hist');
+    if(el) el.innerHTML='<div style="color:var(--mut);padding:20px;font-size:13px">⏳ Өгөгдөл ачааллаж байна... Өнгөрсөн анализ tab-г хэсэг хугацааны дараа дахин нэгтгэнэ үү.</div>';
+    return;
+  }
+  const data=getHistData();
+  const months=getHistMonths();
+
+  // KPI
+  const totRev=data.reduce((s,r)=>s+r.rev,0);
+  const totPrf=data.reduce((s,r)=>s+r.profit,0);
+  const totQty=data.reduce((s,r)=>s+r.qty,0);
+  const totAds=data.reduce((s,r)=>s+r.ads,0);
+  const totRetQty=data.reduce((s,r)=>s+r.ret_qty,0);
+  const totGrossQty=data.reduce((s,r)=>s+r.gross_qty,0);
+  const totCost=data.reduce((s,r)=>s+r.total_cost,0);
+
+  const label=histYear==='all'?'2024–2025 нийт':
+    typeof histYear==='number'?histYear+' он':MN[histYear]+' (2024+2025)';
+
+  document.getElementById('kp-hist').innerHTML=`
+    <div class="kpi b"><div class="kpi-lbl">Нийт орлого</div>
+      <div class="kpi-val">${fmt(totRev)}</div>
+      <div class="kpi-sub">${label}</div></div>
+    <div class="kpi g"><div class="kpi-lbl">Нийт ашиг</div>
+      <div class="kpi-val">${fmt(totPrf)}</div>
+      <div class="kpi-sub">${totRev>0?Math.round(totPrf/totRev*100):0}% margin</div></div>
+    <div class="kpi a"><div class="kpi-lbl">Нийт борлуулалт</div>
+      <div class="kpi-val">${fN(totQty)}</div>
+      <div class="kpi-sub">ширхэг</div></div>
+    <div class="kpi p"><div class="kpi-lbl">Ads зардал / ROAS</div>
+      <div class="kpi-val">${fmt(totAds)}</div>
+      <div class="kpi-sub">ROAS: ${totAds>0?Math.round(totRev/totAds*10)/10:0}x</div></div>
+    <div class="kpi b"><div class="kpi-lbl">Нийт зардал</div>
+      <div class="kpi-val">${fmt(totCost)}</div>
+      <div class="kpi-sub">Орлогын ${totRev>0?Math.round(totCost/totRev*100):0}%</div></div>
+    <div class="kpi" style="border-top:3px solid #ef4444"><div class="kpi-lbl">Буцаалт</div>
+      <div class="kpi-val" style="color:${totRetQty>0?'#f87171':'var(--txt)'}">${fN(totRetQty)}</div>
+      <div class="kpi-sub">${totGrossQty>0?Math.round(totRetQty/totGrossQty*100):0}% rate</div></div>
+  `;
+
+  // Charts
+  setTimeout(()=>{
+    // Сарын орлого
+    const m24=[5,6,7,8].map(mo=>window.__HIST__.months.find(m=>m.year===2024&&m.month===mo)||{rev:0,profit_pct:0,roas:0});
+    const m25=[5,6,7,8].map(mo=>window.__HIST__.months.find(m=>m.year===2025&&m.month===mo)||{rev:0,profit_pct:0,roas:0});
+    if(histYear==='all'||typeof histYear==='number') {
+      bC('c-hist-rev',['5-р сар','6-р сар','7-р сар','8-р сар'],[
+        {label:'2024',data:m24.map(m=>m.rev),backgroundColor:'#3b82f688',borderRadius:5},
+        {label:'2025',data:m25.map(m=>m.rev),backgroundColor:'#10b98188',borderRadius:5},
+      ]);
+      bC('c-hist-prf',['5-р сар','6-р сар','7-р сар','8-р сар'],[
+        {label:'2024 ашиг%',data:m24.map(m=>m.profit_pct),backgroundColor:'#f59e0b88',borderRadius:5},
+        {label:'2025 ашиг%',data:m25.map(m=>m.profit_pct),backgroundColor:'#10b98188',borderRadius:5},
+        {label:'2024 ROAS',data:m24.map(m=>m.roas),type:'line',borderColor:'#3b82f6',pointBackgroundColor:'#3b82f6',tension:.4,fill:false,yAxisID:'y2'},
+        {label:'2025 ROAS',data:m25.map(m=>m.roas),type:'line',borderColor:'#34d399',pointBackgroundColor:'#34d399',tension:.4,fill:false,yAxisID:'y2'},
+      ],{scales:{x:{grid:{display:false},ticks:{font:{size:10}}},y:{grid:{color:'rgba(255,255,255,.04)'},ticks:{font:{size:10},callback:v=>v+'%'},title:{display:true,text:'Ашиг%',font:{size:9}}},y2:{position:'right',grid:{display:false},ticks:{font:{size:10},callback:v=>v+'x'}}}});
+    } else {
+      const moData=months;
+      bC('c-hist-rev',moData.map(m=>m.year+'он'),
+        [{label:'Орлого',data:moData.map(m=>m.rev),backgroundColor:['#3b82f688','#10b98188'],borderRadius:5}]);
+      document.getElementById('hist-rev-ttl').textContent=MN[histYear]+' — он харьцуулалт';
+      bC('c-hist-prf',moData.map(m=>m.year+'он'),[
+        {label:'Ашиг%',data:moData.map(m=>m.profit_pct),backgroundColor:'#f59e0b88',borderRadius:5},
+      ],{pct:true});
+    }
+  },80);
+
+  // Cat filter
+  const allCats=[...new Set(data.map(r=>r.cat1).filter(Boolean))].sort();
+  const cf=document.getElementById('hist-cat-f');
+  const yearKey = String(histYear);
+  if(!cf.children.length || cf.dataset.year !== yearKey){
+    cf.dataset.year = yearKey;
+    histCat = 'all';
+    cf.innerHTML = '';
+    const allBtn = document.createElement('button');
+    allBtn.className = 'fb active';
+    allBtn.textContent = 'Бүгд';
+    allBtn.onclick = function(){ setHistCat('all', this); };
+    cf.appendChild(allBtn);
+    allCats.forEach(c => {
+      const b = document.createElement('button');
+      b.className = 'fb';
+      b.textContent = c;
+      b.onclick = function(){ setHistCat(c, this); };
+      cf.appendChild(b);
+    });
+  }
+  renderHistTbl();
+}
+
+function setHistCat(c,btn){
+  histCat=c;
+  document.querySelectorAll('#hist-cat-f .fb').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  renderHistTbl();
+}
+
+function renderHistTbl(){
+  const srch=(document.getElementById('hist-srch').value||'').toLowerCase();
+  const srt=document.getElementById('hist-srt').value;
+  const sellOnly=document.getElementById('hist-sell-only').checked;
+  let data=getHistData().filter(r=>
+    (histCat==='all'||r.cat1===histCat)&&
+    (!sellOnly||r.sell2026)&&
+    ((r.name||'').toLowerCase().includes(srch)||(r.code||'').includes(srch))
+  );
+  data.sort((a,b)=>b[srt]-a[srt]);
+
+  const isMo=typeof histYear==='string'&&histYear!=='all';
+  document.getElementById('hist-tbl-ttl').textContent=
+    `Барааны дэлгэрэнгүй анализ — ${data.length} бараа`;
+
+  const hdr_year = isMo ? '<th class="num">Он</th>' : '';
+  document.getElementById('hist-tbl').innerHTML=`<thead><tr>
+    <th>#</th><th>Код</th><th>Барааны нэр</th><th>Ангилал1</th><th>Ангилал2</th>
+    <th>2026?</th>${hdr_year}
+    <th class="num">Борл(ш)</th><th class="num">Орлого</th>
+    <th class="num">Дундаж үнэ</th><th class="num">Ашиг</th><th class="num">Ашиг%</th>
+    <th class="num">Ads</th><th class="num">ROAS</th>
+    <th class="num">Бүтээгдэхүүн өртөг</th>
+    <th class="num">Хүргэлт</th><th class="num">Оператор</th>
+    <th class="num">Тогтмол зардал</th><th class="num">Нийт зардал</th>
+    <th class="num">Буцаалт(ш)</th><th class="num">Буцаалт%</th>
+    <th class="num">Ашигласан бонус</th>
+  </tr></thead><tbody>`+
+  data.map((r,i)=>{
+    const yr_cell=isMo?`<td class="num">${r.year||''}</td>`:'';
+    const s26=r.sell2026
+      ?'<span class="tag tg-g" style="font-size:9px">✓ 2026</span>'
+      :'<span class="tag" style="background:rgba(100,116,139,.12);color:#94a3b8;font-size:9px">✗</span>';
+    return `<tr>
+      <td><span class="rk ${i<3?'r'+(i+1):'rn'}">${i+1}</span></td>
+      <td><code style="font-size:10px;color:var(--mut2)">${r.code}</code></td>
+      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;cursor:default" data-name="${r.name}">${r.name||''}</td>
+      <td><span class="tag tg-b" style="font-size:10px">${r.cat1||'—'}</span></td>
+      <td><span class="tag tg-p" style="font-size:10px">${r.cat2||'—'}</span></td>
+      <td>${s26}</td>${yr_cell}
+      <td class="num">${fN(r.qty)}</td>
+      <td class="num">${fmt(r.rev)}</td>
+      <td class="num">${fmt(r.avg_price)}</td>
+      <td class="num" style="color:${r.profit>0?'#34d399':'#f87171'}">${fmt(r.profit)}</td>
+      <td class="num" style="color:${r.profit_pct>15?'#34d399':r.profit_pct>8?'#fbbf24':'#f87171'}">${r.profit_pct.toFixed(1)}%</td>
+      <td class="num">${fmt(r.ads)}</td>
+      <td class="num">${r.roas.toFixed(1)}x</td>
+      <td class="num">${fmt(r.cost)}</td>
+      <td class="num">${fmt(r.delivery)}</td>
+      <td class="num">${fmt(r.operator)}</td>
+      <td class="num">${fmt(r.fixed)}</td>
+      <td class="num">${fmt(r.total_cost)}</td>
+      <td class="num" style="color:${r.ret_qty>0?'#f87171':'var(--mut)'}">${r.ret_qty>0?fN(r.ret_qty):'—'}</td>
+      <td class="num" style="color:${r.ret_pct>5?'#f87171':r.ret_pct>0?'#fbbf24':'var(--mut)'}">${r.ret_pct>0?r.ret_pct.toFixed(1)+'%':'—'}</td>
+      <td class="num">${r.bonus>0?fmt(r.bonus):'—'}</td>
+    </tr>`;
+  }).join('')+`</tbody>
+  <tfoot><tr style="position:sticky;bottom:0;background:var(--sur2);border-top:2px solid var(--brd);font-weight:700">
+    <td colspan="${isMo?7:6}" style="text-align:left;padding:6px 10px;color:var(--mut2);font-size:11px">
+      Нийт ${data.length} бараа
+    </td>
+    <td class="num">${fN(data.reduce((s,r)=>s+r.qty,0))}</td>
+    <td class="num">${fmt(data.reduce((s,r)=>s+r.rev,0))}</td>
+    <td class="num">—</td>
+    <td class="num">${fmt(data.reduce((s,r)=>s+r.profit,0))}</td>
+    <td class="num" style="color:${data.reduce((s,r)=>s+r.rev,0)>0?(Math.round(data.reduce((s,r)=>s+r.profit,0)/data.reduce((s,r)=>s+r.rev,0)*1000)/10)+'%':0+'%'}">
+      ${data.reduce((s,r)=>s+r.rev,0)>0?Math.round(data.reduce((s,r)=>s+r.profit,0)/data.reduce((s,r)=>s+r.rev,0)*1000)/10:0}%
+    </td>
+    <td class="num">${fmt(data.reduce((s,r)=>s+r.ads,0))}</td>
+    <td class="num">${data.reduce((s,r)=>s+r.ads,0)>0?(data.reduce((s,r)=>s+r.rev,0)/data.reduce((s,r)=>s+r.ads,0)).toFixed(1)+'x':'—'}</td>
+    <td class="num">${fmt(data.reduce((s,r)=>s+r.cost,0))}</td>
+    <td class="num">${fmt(data.reduce((s,r)=>s+r.delivery,0))}</td>
+    <td class="num">${fmt(data.reduce((s,r)=>s+r.operator,0))}</td>
+    <td class="num">${fmt(data.reduce((s,r)=>s+r.fixed,0))}</td>
+    <td class="num">${fmt(data.reduce((s,r)=>s+r.total_cost,0))}</td>
+    <td class="num">${fN(data.reduce((s,r)=>s+r.ret_qty,0))}</td>
+    <td class="num">—</td>
+    <td class="num">${fmt(data.reduce((s,r)=>s+r.bonus,0))}</td>
+  </tr></tfoot>`;
+}
+
+// ══════ INIT ══════
+function init() {
+  // Apps Script-аас static+sheet2 нэг request-аар татна
+  const cbName = '_init' + Math.random().toString(36).slice(2);
+  const script = document.createElement('script');
+  const timer = setTimeout(() => {
+    delete window[cbName];
+    try { document.body.removeChild(script); } catch(e){}
+    console.error('Init timeout');
+    document.getElementById('kp-ov').innerHTML =
+      '<div style="color:#f87171;padding:16px">⚠️ Apps Script хариу өгсөнгүй. Хуудсыг reload хийнэ үү.</div>';
+  }, 25000);
+  window[cbName] = (data) => {
+    clearTimeout(timer);
+    delete window[cbName];
+    try { document.body.removeChild(script); } catch(e){}
+    if (data.error) {
+      console.error('Init error:', data.error);
+      return;
+    }
+    // Static дата
+    HIST  = data.hist    || [];
+    CATS  = data.cats    || [];
+    SUM   = data.summary || {};
+    CAT_ADS_PCT = data.cat_ads_pct || {};
+    // Sheet2 дата — HIST-д sell2026 sync
+    if (data.sheet2 && data.sheet2.length > 0) {
+      SHEET2 = data.sheet2;
+      const sellSet = new Set(SHEET2.filter(p=>p.sell2026).map(p=>p.code));
+      HIST.forEach(h=>{ h.sell2026 = sellSet.has(h.code); });
+    }
+    LOADED = true;
+    console.log('✅ Static+Sheet2 татагдлаа:', HIST.length, 'бараа, Sheet2:', SHEET2.length);
+    // Badge шинэчлэх
+    const badge = document.getElementById('live-badge');
+    const text  = document.getElementById('live-text');
+    if(badge) badge.className = 'live';
+    if(text)  text.textContent = 'Live — Sheet2 (' + new Date().toLocaleTimeString() + ')';
+    FC = calcFC(20);
+    renderOv();
+    RENDERED['ov'] = true;
+  };
+  script.onerror = () => {
+    clearTimeout(timer);
+    delete window[cbName];
+    try { document.body.removeChild(script); } catch(e){}
+    console.error('Init script error');
+  };
+  const sep = APPS_SCRIPT_URL.includes('?') ? '&' : '?';
+  script.src = APPS_SCRIPT_URL + sep + 'type=static&callback=' + cbName + '&t=' + Date.now();
+  document.body.appendChild(script);
+}
+
+// ══════════════════════════════════════
+// SALES PLAN 2026
+// ══════════════════════════════════════
+let planCat = 'all';
+
+function renderPlan() {
+  const data = window.__PLAN__ ? Object.values(window.__PLAN__.prod_info||{}) : [];
+  if(!data.length) { document.getElementById('kp-plan').innerHTML='<div style="color:var(--mut);padding:20px">Өгөгдөл байхгүй</div>'; return; }
+  const qty_data = window.__PLAN__.qty||{};
+  const rev_data = window.__PLAN__.rev||{};
+  const SCALE_QTY = 10878 / Math.max(1, Object.values(qty_data).reduce((s,vd)=>s+Object.values(vd).reduce((a,b)=>a+b,0),0));
+  const SCALE_REV = 1540000000 / Math.max(1, Object.values(rev_data).reduce((s,vd)=>s+Object.values(vd).reduce((a,b)=>a+b,0),0));
+  const MONTHS=[5,6,7,8], MN={5:'5-р сар',6:'6-р сар',7:'7-р сар',8:'8-р сар'};
+  const totOq=data.reduce((s,r)=>s+(r.order_qty||0),0);
+  const totRev=data.reduce((s,r)=>s+(r.price||0)*(r.order_qty||0),0);
+  const totCost=data.reduce((s,r)=>s+(r.cost||0)*(r.order_qty||0),0);
+  const revByM=MONTHS.map(m=>Object.entries(rev_data).reduce((s,[code,vd])=>{
+    return s+Object.entries(vd).filter(([ds])=>parseInt(ds.slice(5,7))===m).reduce((ss,[,v])=>ss+Math.round(v*SCALE_REV),0);
+  },0));
+  const peakM=MONTHS[revByM.indexOf(Math.max(...revByM))];
+  document.getElementById('kp-plan').innerHTML=`
+    <div class="kpi b"><div class="kpi-lbl">Нийт захиалга</div><div class="kpi-val">${fN(totOq)}</div><div class="kpi-sub">ширхэг (5–8 сар)</div></div>
+    <div class="kpi g"><div class="kpi-lbl">Нийт орлогын прогноз</div><div class="kpi-val">${fmt(totRev)}</div><div class="kpi-sub">5–8 сарын нийт</div></div>
+    <div class="kpi a"><div class="kpi-lbl">Нийт өртгийн нийлбэр</div><div class="kpi-val">${fmt(totCost)}</div><div class="kpi-sub">худалдан авалтын дүн</div></div>
+    <div class="kpi p"><div class="kpi-lbl">Оргил сар</div><div class="kpi-val">${MN[peakM]}</div><div class="kpi-sub">${fmt(revByM[MONTHS.indexOf(peakM)])} орлого</div></div>
+    <div class="kpi b"><div class="kpi-lbl">Нийт бараа</div><div class="kpi-val">${data.length}</div><div class="kpi-sub">нэр төрөл</div></div>`;
+  setTimeout(()=>{
+    const labs=MONTHS.map(m=>MN[m]);
+    const qByM=MONTHS.map(m=>Object.entries(qty_data).reduce((s,[code,vd])=>s+Object.entries(vd).filter(([ds])=>parseInt(ds.slice(5,7))===m).reduce((ss,[,v])=>ss+Math.round(v*SCALE_QTY),0),0));
+    bC('c-plan-qty',labs,[{label:'Борлуулалт (ш)',data:qByM,backgroundColor:['#3b82f655','#10b98155','#f59e0b99','#ef444455'],borderColor:['#3b82f6','#10b981','#f59e0b','#ef4444'],borderWidth:2,borderRadius:6}]);
+    bC('c-plan-rev',labs,[{label:'Орлого (₮)',data:revByM,backgroundColor:['#3b82f655','#10b98155','#f59e0b99','#ef444455'],borderColor:['#3b82f6','#10b981','#f59e0b','#ef4444'],borderWidth:2,borderRadius:6}]);
+  },80);
+  const allCats=[...new Set(data.map(r=>r.cat1))].sort();
+  const cf=document.getElementById('plan-cat-f');
+  if(!cf.children.length){
+    cf.innerHTML=`<button class="fb active" onclick="setPlanCat('all',this)">Бүгд</button>`+
+      allCats.map(c=>`<button class="fb" onclick="setPlanCat('${c.replace(/'/g,"\'").replace(/"/g,'&quot;')}',this)">${c}</button>`).join('');
+  }
+  renderPlanTbl();
+}
+
+function setPlanCat(c,btn){
+  planCat=c;
+  document.querySelectorAll('#plan-cat-f .fb').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  renderPlanTbl();
+}
+
+function renderPlanTbl(){
+  const allProds=window.__PLAN__?Object.values(window.__PLAN__.prod_info||{}):[];
+  const qty_data=window.__PLAN__?window.__PLAN__.qty||{}:{};
+  const rev_data=window.__PLAN__?window.__PLAN__.rev||{}:{};
+  const SCALE_QTY=10878/Math.max(1,Object.values(qty_data).reduce((s,vd)=>s+Object.values(vd).reduce((a,b)=>a+b,0),0));
+  const SCALE_REV=1540000000/Math.max(1,Object.values(rev_data).reduce((s,vd)=>s+Object.values(vd).reduce((a,b)=>a+b,0),0));
+  const view=document.getElementById('plan-view')?.value||'qty';
+  const srch=(document.getElementById('plan-srch')?.value||'').toLowerCase();
+  const MONTHS=[5,6,7,8],MN={5:'5-р сар',6:'6-р сар',7:'7-р сар',8:'8-р сар'};
+  const isRev=view==='rev',isCost=view==='cost';
+  const data=allProds.filter(r=>(planCat==='all'||r.cat1===planCat)&&((r.name||'').toLowerCase().includes(srch)||(r.code||'').includes(srch)));
+  const sorted=[...data].sort((a,b)=>{
+    if(a.cat1!==b.cat1) return a.cat1.localeCompare(b.cat1);
+    return ((b.price||0)*(b.order_qty||0))-((a.price||0)*(a.order_qty||0));
+  });
+  const FS='style="position:sticky;bottom:0;background:var(--sur2);border-top:2px solid var(--brd);font-weight:700"';
+  const getV=(code,ds)=>{
+    const q=Math.round((qty_data[code]?.[ds]||0)*SCALE_QTY);
+    if(isCost) return q*(window.__PLAN__?.prod_info?.[code]?.cost||0);
+    if(isRev) return Math.round((rev_data[code]?.[ds]||0)*SCALE_REV);
+    return q;
+  };
+  document.getElementById('plan-tbl').innerHTML=`<thead><tr>
+    <th>#</th><th>Код</th><th>Барааны нэр</th><th>Ангилал</th>
+    <th class="num">Нийт захиалга</th>
+    <th class="num" style="color:#3b82f6">5-р сар</th><th class="num" style="color:#10b981">6-р сар</th>
+    <th class="num" style="color:#f59e0b">7-р сар</th><th class="num" style="color:#ef4444">8-р сар</th>
+    <th class="num">Нийт ${isRev?'орлого':isCost?'өртөг':'борлуулалт'}</th>
+    <th class="num">Үнэ</th><th class="num">Өртөг</th><th>Төрөл</th>
+  </tr></thead><tbody>`+
+  sorted.map((r,i)=>{
+    const oq=r.order_qty||0;
+    const vByM=MONTHS.map(m=>{
+      const dates=Object.keys(qty_data[r.code]||{}).filter(ds=>parseInt(ds.slice(5,7))===m);
+      return dates.reduce((s,ds)=>s+getV(r.code,ds),0);
+    });
+    const tot=vByM.reduce((s,v)=>s+v,0);
+    const typ=r.is_new?'<span class="tag tg-p">🆕 Шинэ</span>':r.has_stock?'<span class="tag tg-g">📦 Үлдэгдэлтэй</span>':'<span class="tag tg-b">🔄 Шинэ захиалга</span>';
+    return `<tr>
+      <td><span class="rk rn">${i+1}</span></td>
+      <td><code style="font-size:10px;color:var(--mut2)">${r.code}</code></td>
+      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;cursor:default" data-name="${r.name||''}">${r.name||''}</td>
+      <td><span class="tag tg-b" style="font-size:10px">${r.cat1||''}</span></td>
+      <td class="num" style="font-weight:600">${fN(oq)}</td>
+      ${vByM.map((v,mi)=>`<td class="num" style="color:${['#3b82f6','#10b981','#f59e0b','#ef4444'][mi]}">${isRev||isCost?fmt(v):fN(v)}</td>`).join('')}
+      <td class="num">${isRev||isCost?fmt(tot):fN(tot)}</td>
+      <td class="num">${r.price>0?fmt(r.price):'—'}</td>
+      <td class="num">${r.cost>0?fmt(r.cost):'—'}</td>
+      <td>${typ}</td>
+    </tr>`;
+  }).join('')+`</tbody>
+  <tfoot><tr ${FS}>
+    <td colspan="4" style="text-align:left;padding:6px 10px;color:var(--mut2);font-size:11px">Нийт ${sorted.length} бараа</td>
+    <td class="num">${fN(sorted.reduce((s,r)=>s+(r.order_qty||0),0))}</td>
+    ${MONTHS.map(m=>{
+      const tot2=sorted.reduce((s,r)=>{
+        const dates=Object.keys(qty_data[r.code]||{}).filter(ds=>parseInt(ds.slice(5,7))===m);
+        return s+dates.reduce((ss,ds)=>ss+getV(r.code,ds),0);},0);
+      return `<td class="num">${isRev||isCost?fmt(tot2):fN(tot2)}</td>`;
+    }).join('')}
+    <td class="num">${isRev||isCost?fmt(sorted.reduce((s,r)=>s+MONTHS.reduce((ms,m)=>{const ds=Object.keys(qty_data[r.code]||{}).filter(d=>parseInt(d.slice(5,7))===m);return ms+ds.reduce((ss,d)=>ss+getV(r.code,d),0);},0),0)):fN(sorted.reduce((s,r)=>s+(r.order_qty||0),0))}</td>
+    <td colspan="3"></td>
+  </tr></tfoot>`;
+}
+
+// ══════════════════════════════════════
+// 2026 ГҮЙЦЭТГЭЛ TAB
+// ══════════════════════════════════════
+let ACTUAL_CAT='all';
+const TARGET_REV=1540000000, TARGET_QTY=10878;
+
+function setActualRange(type,btn){
+  const today=new Date().toISOString().split('T')[0];
+  const fromEl=document.getElementById('act-from');
+  const toEl=document.getElementById('act-to');
+  ['all','m5','m6','m7','m8'].forEach(k=>{const b=document.getElementById('act-range-'+k);if(b)b.classList.remove('active');});
+  if(btn) btn.classList.add('active');
+  if(type==='all'){fromEl.value='2026-05-01';toEl.value=today;}
+  else if(type==='m5'){fromEl.value='2026-05-01';toEl.value='2026-05-31';}
+  else if(type==='m6'){fromEl.value='2026-06-01';toEl.value='2026-06-30';}
+  else if(type==='m7'){fromEl.value='2026-07-01';toEl.value='2026-07-31';}
+  else if(type==='m8'){fromEl.value='2026-08-01';toEl.value='2026-08-31';}
+  renderActual();
+}
+
+function loadActual2026(){
+  const st=document.getElementById('act-status');
+  if(st) st.textContent='⏳ Дата татаж байна...';
+  const cbName='_actual'+Math.random().toString(36).slice(2);
+  const script=document.createElement('script');
+  const timer=setTimeout(()=>{delete window[cbName];try{document.body.removeChild(script);}catch(e){}
+    if(st) st.textContent='⚠️ Timeout'; setTimeout(loadActual2026,10000);},20000);
+  window[cbName]=(data)=>{
+    clearTimeout(timer);delete window[cbName];try{document.body.removeChild(script);}catch(e){}
+    if(data.error){if(st) st.textContent='❌ '+data.error;return;}
+    ACTUAL2026=data;
+    if(st) st.textContent='✅ Шинэчлэгдлээ '+(data.updated?new Date(data.updated).toLocaleTimeString():'');
+    renderActual();
+  };
+  script.onerror=()=>{clearTimeout(timer);delete window[cbName];try{document.body.removeChild(script);}catch(e){}
+    if(st) st.textContent='❌ Алдаа';setTimeout(loadActual2026,10000);};
+  const sep=APPS_SCRIPT_URL.includes('?')?'&':'?';
+  script.src=APPS_SCRIPT_URL+sep+'type=actual2026&callback='+cbName+'&t='+Date.now();
+  document.body.appendChild(script);
+}
+
+function getPlanInRange(from,to){
+  const pd=window.__PLAN_DATA__;
+  if(!pd) return {rev:0,qty:0};
+  let rev=0;
+  Object.entries(pd.daily_plan||{}).forEach(([ds,v])=>{if(ds>=from&&ds<=to) rev+=v;});
+  const totPlan=Object.values(pd.daily_plan||{}).reduce((s,v)=>s+v,0)||1;
+  return {rev,qty:Math.round(TARGET_QTY*rev/totPlan)};
+}
+
+function renderActual(){
+  const pd=window.__PLAN_DATA__;
+  if(!ACTUAL2026||!pd){if(!ACTUAL2026){loadActual2026();return;}return;}
+  const fromEl=document.getElementById('act-from');
+  const toEl=document.getElementById('act-to');
+  const from=fromEl?fromEl.value:'2026-05-20';
+  const to=toEl?toEl.value:new Date().toISOString().split('T')[0];
+  // Шүүсэн нийт
+  const agg={rev:0,qty:0,profit:0,ads:0,cost:0,ret_qty:0,gross_qty:0};
+  const daily_f={};
+  Object.entries(ACTUAL2026.daily||{}).forEach(([ds,v])=>{
+    if(ds>=from&&ds<=to){agg.rev+=v.rev;agg.qty+=v.qty;agg.profit+=v.profit;agg.ads+=v.ads;agg.cost+=v.cost;agg.ret_qty+=v.ret_qty||0;daily_f[ds]=v;}
+  });
+  agg.profit_pct=agg.rev>0?Math.round(agg.profit/agg.rev*1000)/10:0;
+  agg.ads_pct=agg.rev>0?Math.round(agg.ads/agg.rev*1000)/10:0;
+  agg.roas=agg.ads>0?Math.round(agg.rev/agg.ads*10)/10:0;
+  const plan=getPlanInRange(from,to);
+  const diff_rev=agg.rev-plan.rev;
+  const pct_target=Math.round(agg.rev/TARGET_REV*1000)/10;
+  const pct_plan=plan.rev>0?Math.round(agg.rev/plan.rev*1000)/10:0;
+  // Зорилтын явц
+  document.getElementById('act-pct-big').textContent=pct_target+'%';
+  document.getElementById('act-pct-big').style.color=pct_plan>=95?'#34d399':pct_plan>=80?'#fbbf24':'#f87171';
+  document.getElementById('act-bar-actual').style.width=Math.min(agg.rev/TARGET_REV*100,100)+'%';
+  document.getElementById('act-bar-plan').style.width=Math.min(plan.rev/TARGET_REV*100,100)+'%';
+  document.getElementById('act-bar-label-left').textContent='Бодит: '+fmt(agg.rev);
+  document.getElementById('act-bar-label-plan').textContent='Төлөвлөгөө ('+from.slice(5)+'-'+to.slice(5)+'): '+fmt(plan.rev);
+  const firstReal=Object.keys(daily_f).sort()[0];
+  const dataNote=firstReal&&firstReal>from?` (бодит дата ${firstReal.slice(5)}-с)`:'';
+  document.getElementById('act-target-info').innerHTML=`${from.slice(5)}–${to.slice(5)}${dataNote}: Төлөвлөгөөний <b>${pct_plan}%</b> <span style="color:${diff_rev>=0?'#34d399':'#f87171'}">(${diff_rev>=0?'+':''}${fmt(diff_rev)})</span>`;
+  // KPI
+  const kpis=[
+    {lbl:'Нийт орлого',val:fmt(agg.rev),sub:fmt(plan.rev)+' төлөвлөгөө',pct:plan.rev>0?Math.round(agg.rev/plan.rev*100):0,diff:diff_rev,cls:'g'},
+    {lbl:'Нийт ашиг',val:fmt(agg.profit),sub:agg.profit_pct.toFixed(1)+'% margin',pct:null,diff:null,cls:'b'},
+    {lbl:'Нийт захиалга',val:fN(agg.qty),sub:fN(plan.qty)+' төлөвлөгөө',pct:plan.qty>0?Math.round(agg.qty/plan.qty*100):0,diff:agg.qty-plan.qty,cls:'p',is_qty:true},
+    {lbl:'Ads зардал',val:fmt(agg.ads),sub:agg.ads_pct.toFixed(1)+'% орлогоос',pct:null,diff:null,cls:'a'},
+    {lbl:'ROAS',val:agg.roas.toFixed(1)+'x',sub:'Ads: '+fmt(agg.ads),pct:null,diff:null,cls:'b'},
+    {lbl:'Буцаалт',val:fN(agg.ret_qty),sub:agg.gross_qty>0?Math.round(agg.ret_qty/(agg.gross_qty||1)*100)+'%':'—',pct:null,diff:null,cls:'a'},
+  ];
+  document.getElementById('kp-actual').innerHTML=kpis.map(k=>{
+    const ps=k.pct!=null?`<span style="font-size:11px;color:${k.pct>=95?'#34d399':k.pct>=80?'#fbbf24':'#f87171'}">${k.pct}%</span>`:'';
+    const ds=k.diff!=null?`<span style="color:${k.diff>=0?'#34d399':'#f87171'};font-size:10px">${k.diff>=0?'+':''}${k.is_qty?fN(k.diff):fmt(k.diff)}</span>`:'';
+    return `<div class="kpi ${k.cls}"><div class="kpi-lbl">${k.lbl}</div><div class="kpi-val" style="font-size:18px">${k.val} ${ps}</div><div class="kpi-sub">${k.sub} ${ds}</div></div>`;
+  }).join('');
+  // Графикууд
+  setTimeout(()=>{
+    // График-т зөвхөн бодит дата эхэлсэн өдрөөс харуулна
+    // (KPI нь from/to бүтэн хугацааг тооцдог)
+    const firstActualDate = Object.keys(daily_f).sort()[0] || from;
+    const chartFrom = firstActualDate < from ? from : firstActualDate;
+    const all_dates=[];let d=new Date(chartFrom);const end=new Date(to);
+    while(d<=end){all_dates.push(d.toISOString().split('T')[0]);d.setDate(d.getDate()+1);}
+    const act_d=all_dates.map(ds=>daily_f[ds]?daily_f[ds].rev:0);
+    // Прогноз зөвхөн daily_plan дата байгаа өдрүүдэд харагдана
+    const firstPlanDate=Object.keys(pd.daily_plan||{}).sort()[0]||'2026-05-20';
+    const plan_d=all_dates.map(ds=>ds<firstPlanDate?null:((pd.daily_plan||{})[ds]||0));
+    bC('c-actual-daily',all_dates.map(d=>d.slice(5)),[
+      {label:'Бодит',data:act_d,backgroundColor:'#10b98166',borderColor:'#10b981',borderWidth:2,borderRadius:3,type:'bar'},
+      {label:'Прогноз',data:plan_d,borderColor:'#f59e0b',backgroundColor:'transparent',borderWidth:1.5,type:'line',tension:0.3,pointRadius:0,spanGaps:false},
+    ]);
+    let ca=0,cp=0;const cum_a=[],cum_p=[];
+    all_dates.forEach(ds=>{
+      ca+=daily_f[ds]?daily_f[ds].rev:0;
+      cp+=ds<firstPlanDate?0:((pd.daily_plan||{})[ds]||0);
+      cum_a.push(ca);
+      cum_p.push(ds<firstPlanDate?null:cp);
+    });
+    bC('c-actual-cum',all_dates.map(d=>d.slice(5)),[
+      {label:'Бодит',data:cum_a,borderColor:'#10b981',backgroundColor:'#10b98122',borderWidth:2,fill:true,tension:0.3,pointRadius:0},
+      {label:'Прогноз',data:cum_p,borderColor:'#f59e0b',backgroundColor:'transparent',borderWidth:1.5,tension:0.3,pointRadius:0},
+    ]);
+  },80);
+  // Cat filter
+  const cats=[...new Set((ACTUAL2026.by_code||[]).map(b=>b.cat1))].filter(Boolean).sort();
+  const cf=document.getElementById('act-cat-f');
+  if(cf&&!cf.children.length){
+    cf.innerHTML=`<button class="fb active" onclick="setActualCat('all',this)">Бүгд</button>`+
+      cats.map(c=>`<button class="fb" onclick="setActualCat('${c.replace(/'/g,"\'").replace(/"/g,'&quot;')}',this)">${c}</button>`).join('');
+  }
+  renderActualTbl();
+}
+
+function setActualCat(c,btn){
+  ACTUAL_CAT=c;
+  document.querySelectorAll('#act-cat-f .fb').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  renderActualTbl();
+}
+
+function renderActualTbl(){
+  if(!ACTUAL2026) return;
+  const pd=window.__PLAN_DATA__;
+  const srch=(document.getElementById('act-srch')?.value||'').toLowerCase();
+  const srt=document.getElementById('act-srt')?.value||'rev';
+  const diffOnly=document.getElementById('act-diff-only')?.checked;
+  const FS='style="position:sticky;bottom:0;background:var(--sur2);border-top:2px solid var(--brd);font-weight:700"';
+
+  // Борлуулалт байгаа барааны map
+  const actualMap={};
+  (ACTUAL2026.by_code||[]).forEach(b=>{ actualMap[b.code]=b; });
+
+  // Прогноз дотор байгаа бүх бараа + бодит нэмэх (0 орно)
+  const allCodes=new Set([
+    ...Object.keys(actualMap),
+    ...Object.keys(pd?.prod_plan||{})
+  ]);
+  const HIST_MAP={};
+  (HIST||[]).forEach(h=>{ HIST_MAP[h.code]=h; });
+
+  let rows=[...allCodes].map(code=>{
+    const b=actualMap[code]||{code,name:'',cat1:'',cat2:'',rev:0,qty:0,profit:0,ads:0,cost:0,ret_qty:0,gross_qty:0,profit_pct:0,ads_pct:0,ret_pct:0,roas:0,avg_price:0};
+    // HIST-аас нэр, ангилал авна
+    if(!b.name && HIST_MAP[code]) { b.name=HIST_MAP[code].name||''; b.cat1=HIST_MAP[code].cat1||''; b.cat2=HIST_MAP[code].cat2||''; }
+    if(!b.name && pd?.prod_plan?.[code]) { b.name=pd.prod_plan[code].name||''; b.cat1=pd.prod_plan[code].cat1||''; }
+    const pp=(pd?.prod_plan||{})[code]||{plan_rev:0,plan_qty:0};
+    const pct_rev=pp.plan_rev>0?Math.round(b.rev/pp.plan_rev*1000)/10:null;
+    const diff_rev=pp.plan_rev>0?b.rev-pp.plan_rev:null;
+    return {...b,plan_rev:pp.plan_rev,plan_qty:pp.plan_qty,pct_rev,diff_rev};
+  }).filter(b=>{
+    if(ACTUAL_CAT!=='all'&&b.cat1!==ACTUAL_CAT) return false;
+    if(srch&&!(b.name||'').toLowerCase().includes(srch)&&!(b.code||'').includes(srch)) return false;
+    return true;
+  });
+  if(diffOnly) rows=rows.filter(b=>b.pct_rev!=null&&Math.abs(100-(b.pct_rev||0))>15);
+  const showZero=document.getElementById('act-zero-show')?.checked!==false;
+  if(!showZero) rows=rows.filter(b=>b.rev>0);
+  // Сарын filter — тухайн сарын бодит тоо тооцоолно
+  const tblMonth=document.getElementById('act-tbl-month')?.value||'all';
+  if(tblMonth!=='all'){
+    const m=parseInt(tblMonth);
+    rows=rows.map(b=>{
+      const dayData=ACTUAL2026.daily||{};
+      let mRev=0,mQty=0,mPrf=0,mAds=0;
+      Object.entries(dayData).forEach(([ds,v])=>{
+        if(parseInt(ds.slice(5,7))===m){ mRev+=v.rev||0;mQty+=v.qty||0;mPrf+=v.profit||0;mAds+=v.ads||0; }
+      });
+      // by_code-оос кодоор шүүх боломжгүй тул нийт ratio ашиглана
+      const totRev=(ACTUAL2026.summary?.rev||1);
+      const ratio=totRev>0?(b.rev/totRev):0;
+      return {...b,
+        rev:Math.round(mRev*ratio),qty:Math.round(mQty*ratio),
+        profit:Math.round(mPrf*ratio),ads:Math.round(mAds*ratio),
+        profit_pct:mRev>0?Math.round(mPrf*ratio/(mRev*ratio||1)*1000)/10:0,
       };
     });
   }
-
-  const lastRow = sh1.getLastRow();
-  const lastCol = sh1.getLastColumn();
-  const hdr = sh1.getRange(1,1,1,lastCol).getValues()[0].map(h=>(h||'').toString().trim());
-
-  const fi = {
-    date:    hdr.indexOf('Огноо'),
-    code:    hdr.indexOf('Барааны код'),
-    net_q:   hdr.findIndex(h=>h.includes('Цэвэр борлуулалт')&&h.includes('тоогоор')),
-    net_r:   hdr.findIndex(h=>h.includes('Цэвэр борлуулалт')&&h.includes('төгрөгөөр')),
-    gross_q: hdr.findIndex(h=>h.includes('Борлуулалтын дүн')&&h.includes('тоогоор')),
-    ret_q:   hdr.findIndex(h=>h.includes('Буцаалтын дүн')&&h.includes('тоогоор')),
-    cost:    hdr.findIndex(h=>h.includes('өртөг')),
-    ads:     hdr.findIndex(h=>h.includes('Бүүст')),
-    profit:  hdr.indexOf('Ашиг'),
-    bonus:   hdr.findIndex(h=>h.includes('бонус')),
-    delivery:hdr.findIndex(h=>h.includes('Хүргэлт')),
-    operator:hdr.findIndex(h=>h.includes('Оператор')),
-    fixed:   hdr.findIndex(h=>h.includes('Тогтмол')),
-    tax:     hdr.findIndex(h=>h.includes('Татвар')),
-  };
-
-  const vals = sh1.getRange(2,1,lastRow-1,lastCol).getValues();
-
-  const daily   = {};
-  const monthly = {};
-  const byCode  = {};
-  let   summary = { rev:0, qty:0, profit:0, ads:0, cost:0, ret_qty:0, gross_qty:0 };
-
-  vals.forEach(r => {
-    const dv = r[fi.date]; if (!dv) return;
-    let d; try { d=new Date(dv); } catch(e) { return; }
-    if (isNaN(d.getTime())) return;
-    const yr = d.getFullYear();
-    if (yr !== 2026) return;
-
-    const mo  = d.getMonth()+1;
-    const ds  = yr+'-'+String(mo).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
-    const ms  = yr+'-'+String(mo).padStart(2,'0');
-    const code = (r[fi.code]||'').toString().trim();
-    const meta = codeMap[code]||{name:'',cat1:'',cat2:'',sell2026:false};
-
-    const qty   = +r[fi.net_q]   ||0;
-    const rev   = +r[fi.net_r]   ||0;
-    const gq    = +r[fi.gross_q] ||0;
-    const rq    = +r[fi.ret_q]   ||0;
-    const cost  = +r[fi.cost]    ||0;
-    const ads   = +r[fi.ads]     ||0;
-    const prf   = +r[fi.profit]  ||0;
-    const del   = +r[fi.delivery]||0;
-    const ops   = +r[fi.operator]||0;
-    const fix   = +r[fi.fixed]   ||0;
-
-    if (!daily[ds]) daily[ds] = {rev:0,qty:0,profit:0,ads:0,cost:0,ret_qty:0};
-    daily[ds].rev+=rev; daily[ds].qty+=qty; daily[ds].profit+=prf;
-    daily[ds].ads+=ads; daily[ds].cost+=cost; daily[ds].ret_qty+=rq;
-
-    if (!monthly[ms]) monthly[ms] = {rev:0,qty:0,profit:0,ads:0,cost:0,ret_qty:0,gross_qty:0};
-    monthly[ms].rev+=rev; monthly[ms].qty+=qty; monthly[ms].profit+=prf;
-    monthly[ms].ads+=ads; monthly[ms].cost+=cost; monthly[ms].ret_qty+=rq; monthly[ms].gross_qty+=gq;
-
-    if (!byCode[code]) byCode[code] = {
-      code, name:meta.name, cat1:meta.cat1, cat2:meta.cat2,
-      rev:0, qty:0, profit:0, ads:0, cost:0, ret_qty:0, gross_qty:0
-    };
-    const bc = byCode[code];
-    bc.rev+=rev; bc.qty+=qty; bc.profit+=prf;
-    bc.ads+=ads; bc.cost+=cost; bc.ret_qty+=rq; bc.gross_qty+=gq;
-
-    summary.rev+=rev; summary.qty+=qty; summary.profit+=prf;
-    summary.ads+=ads; summary.cost+=cost; summary.ret_qty+=rq; summary.gross_qty+=gq;
+  rows.sort((a,b2)=>{
+    if(srt==='rev') return b2.rev-a.rev;if(srt==='qty') return b2.qty-a.qty;
+    if(srt==='profit_pct') return b2.profit_pct-a.profit_pct;if(srt==='roas') return b2.roas-a.roas;
+    if(srt==='pct_rev') return (b2.pct_rev||0)-(a.pct_rev||0);return b2.rev-a.rev;
   });
-
-  const sorted_dates = Object.keys(daily).sort();
-  let cum_rev=0, cum_qty=0;
-  const cumulative = {};
-  sorted_dates.forEach(ds => {
-    cum_rev += daily[ds].rev;
-    cum_qty += daily[ds].qty;
-    cumulative[ds] = { rev: cum_rev, qty: cum_qty };
-  });
-
-  Object.values(byCode).forEach(b => {
-    b.profit_pct = b.rev>0 ? Math.round(b.profit/b.rev*1000)/10 : 0;
-    b.ads_pct    = b.rev>0 ? Math.round(b.ads/b.rev*1000)/10    : 0;
-    b.ret_pct    = b.gross_qty>0 ? Math.round(b.ret_qty/b.gross_qty*1000)/10 : 0;
-    b.roas       = b.ads>0 ? Math.round(b.rev/b.ads*10)/10 : 0;
-    b.avg_price  = b.qty>0 ? Math.round(b.rev/b.qty) : 0;
-  });
-  summary.profit_pct = summary.rev>0 ? Math.round(summary.profit/summary.rev*1000)/10 : 0;
-  summary.ads_pct    = summary.rev>0 ? Math.round(summary.ads/summary.rev*1000)/10    : 0;
-  summary.roas       = summary.ads>0 ? Math.round(summary.rev/summary.ads*10)/10       : 0;
-
-  Logger.log('2026 бодит: rev='+Math.round(summary.rev/1e6)+'M qty='+summary.qty);
-
-  return {
-    summary,
-    daily,
-    cumulative,
-    monthly,
-    by_code: Object.values(byCode),
-    updated: new Date().toISOString(),
-  };
+  const pc=p=>p==null?'var(--mut)':p>=100?'#34d399':p>=80?'#fbbf24':'#f87171';
+  document.getElementById('actual-tbl').innerHTML=`<thead><tr>
+    <th>#</th><th>Код</th><th>Нэр</th><th>Ангилал</th>
+    <th class="num">Бодит борлуулалт</th><th class="num">Прогноз</th><th class="num">Биелэлт%</th><th class="num">Зөрүү</th>
+    <th class="num">Бодит тоо</th><th class="num">Прогноз тоо</th>
+    <th class="num">Ашиг%</th><th class="num">Ads%</th><th class="num">ROAS</th><th class="num">Буцаалт%</th>
+  </tr></thead><tbody>`+
+  rows.map((b,i)=>`<tr>
+    <td><span class="rk rn">${i+1}</span></td>
+    <td style="font-size:10px;color:var(--mut2)">${b.code}</td>
+    <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;cursor:default" data-name="${b.name}">${b.name}</td>
+    <td><span class="tag tg-b" style="font-size:10px">${b.cat1||'—'}</span></td>
+    <td class="num">${fmt(b.rev)}</td>
+    <td class="num" style="color:var(--mut2)">${b.plan_rev>0?fmt(b.plan_rev):'—'}</td>
+    <td class="num" style="color:${pc(b.pct_rev)};font-weight:600">${b.pct_rev!=null?b.pct_rev+'%':'—'}</td>
+    <td class="num" style="color:${b.diff_rev!=null?(b.diff_rev>=0?'#34d399':'#f87171'):'var(--mut)'}">${b.diff_rev!=null?(b.diff_rev>=0?'+':'')+fmt(b.diff_rev):'—'}</td>
+    <td class="num">${fN(b.qty)}</td>
+    <td class="num" style="color:var(--mut2)">${b.plan_qty>0?fN(b.plan_qty):'—'}</td>
+    <td class="num" style="color:${(b.profit_pct||0)>15?'#34d399':(b.profit_pct||0)>8?'#fbbf24':'#f87171'}">${(b.profit_pct||0).toFixed(1)}%</td>
+    <td class="num" style="color:${(b.ads_pct||0)>20?'#f87171':(b.ads_pct||0)>10?'#fbbf24':'var(--mut2)'}">${(b.ads_pct||0).toFixed(1)}%</td>
+    <td class="num">${(b.roas||0)>0?(b.roas||0).toFixed(1)+'x':'—'}</td>
+    <td class="num" style="color:${(b.ret_pct||0)>5?'#f87171':'var(--mut2)'}">${(b.ret_pct||0)>0?(b.ret_pct||0).toFixed(1)+'%':'—'}</td>
+  </tr>`).join('')+`</tbody>
+  <tfoot><tr ${FS}>
+    <td colspan="4" style="text-align:left;padding:6px 10px;color:var(--mut2);font-size:11px">Нийт ${rows.length} бараа</td>
+    <td class="num">${fmt(rows.reduce((s,r)=>s+r.rev,0))}</td>
+    <td class="num">${fmt(rows.reduce((s,r)=>s+r.plan_rev,0))}</td>
+    <td class="num">${rows.reduce((s,r)=>s+r.plan_rev,0)>0?Math.round(rows.reduce((s,r)=>s+r.rev,0)/rows.reduce((s,r)=>s+r.plan_rev,0)*1000)/10+'%':'—'}</td>
+    <td class="num">${fmt(rows.reduce((s,r)=>s+(r.diff_rev||0),0))}</td>
+    <td class="num">${fN(rows.reduce((s,r)=>s+r.qty,0))}</td>
+    <td class="num">${fN(rows.reduce((s,r)=>s+r.plan_qty,0))}</td>
+    <td colspan="4"></td>
+  </tr></tfoot>`;
 }
+
+init();
+(function(){
+  const today=new Date().toISOString().split('T')[0];
+  const f=document.getElementById('act-from');
+  const t=document.getElementById('act-to');
+  if(f) f.value='2026-05-01';
+  if(t) t.value=today;
+})();
+
+// Sheet2-г 5 минут тутам дахин татна
+// 5 минут тутам Sheet2+HIST шинэчилнэ
+setInterval(() => {
+  if (!APPS_SCRIPT_URL) return;
+  const cbName = '_refresh' + Math.random().toString(36).slice(2);
+  const script = document.createElement('script');
+  window[cbName] = (data) => {
+    delete window[cbName];
+    try { document.body.removeChild(script); } catch(e){}
+    if (!data || data.error) return;
+    if (data.sheet2 && data.sheet2.length > 0) {
+      SHEET2 = data.sheet2;
+      const sellSet = new Set(SHEET2.filter(p=>p.sell2026).map(p=>p.code));
+      HIST.forEach(h=>{ h.sell2026 = sellSet.has(h.code); });
+    }
+    FC = calcFC(20);
+    // Нээлттэй табыг шинэчилнэ
+    const activeTab = document.querySelector('.nb.active');
+    if (activeTab) {
+      const n = activeTab.getAttribute('onclick').match(/ST\('(\w+)'/);
+      if (n && RENDERED[n[1]]) { RENDERED[n[1]] = false; RenderTab(n[1]); RENDERED[n[1]] = true; }
+    }
+    const text = document.getElementById('live-text');
+    if (text) text.textContent = 'Live — Sheet2 (' + new Date().toLocaleTimeString() + ')';
+    console.log('✅ Refresh:', new Date().toLocaleTimeString());
+  };
+  script.onerror = () => { delete window[cbName]; try{document.body.removeChild(script);}catch(e){} };
+  const sep = APPS_SCRIPT_URL.includes('?') ? '&' : '?';
+  script.src = APPS_SCRIPT_URL + sep + 'type=sheet2&callback=' + cbName + '&t=' + Date.now();
+  document.body.appendChild(script);
+}, 5*60*1000);
+</script>
+<script>
+(function loadHist() {
+  // Apps Script-аас JSONP-р шууд татна
+  const cbName = '_hist' + Math.random().toString(36).slice(2);
+  const script = document.createElement('script');
+  const timer = setTimeout(() => {
+    delete window[cbName];
+    try { document.body.removeChild(script); } catch(e){}
+    console.error('Hist JSONP timeout — Apps Script хариу өгөхгүй байна');
+    // Retry 10 секундын дараа
+    setTimeout(loadHist, 10000);
+  }, 20000);
+  window[cbName] = (data) => {
+    clearTimeout(timer);
+    delete window[cbName];
+    try { document.body.removeChild(script); } catch(e){}
+    applyHistData(data);
+    console.log('✅ Hist дата татагдлаа', new Date().toLocaleTimeString());
+  };
+  script.onerror = () => {
+    clearTimeout(timer);
+    delete window[cbName];
+    try { document.body.removeChild(script); } catch(e){}
+    console.error('Hist script error — 10с-н дараа дахин оролдоно');
+    setTimeout(loadHist, 10000);
+  };
+  const sep = APPS_SCRIPT_URL.includes('?') ? '&' : '?';
+  script.src = APPS_SCRIPT_URL + sep + 'type=hist&callback=' + cbName + '&t=' + Date.now();
+  document.body.appendChild(script);
+})();
+
+function applyHistData(data) {
+  window.__HIST__ = data;
+  const cnt = data.prod_ym ? data.prod_ym.length : 0;
+  console.log('✅ Hist дата:', cnt, 'prod_ym мөр');
+  const histTab = document.getElementById('t-hist');
+  if (histTab && histTab.classList.contains('active')) {
+    RENDERED['hist'] = false;
+    renderHist();
+    RENDERED['hist'] = true;
+  }
+}
+</script>
+<script>
+// type=plan — JSONP аргаар татах (бусад endpoint-тэй адил)
+(function() {
+  var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxHP1CcQ4R6ylaQPGUwyH9AC3XsCSqZdutyFujJN6n2U0Y7Oq7p6SGGJyuDEthsoU0L/exec';
+  var MAX_RETRIES = 3;
+  var attempt = 0;
+
+  window.__PLAN_DATA__ = { prod_plan: {}, daily_plan: {}, cum_plan: {}, total_target: 1540000000, total_qty_target: 10878 };
+  window.__PLAN__ = { qty: {}, rev: {}, prod_info: {} };
+
+  function applyPlanData(data) {
+    var pp = data.prod_plan || {};
+    window.__PLAN_DATA__.prod_plan = pp;
+    window.__PLAN_DATA__.total_target = data.total_target || 1540000000;
+    window.__PLAN_DATA__.total_qty_target = data.total_qty_target || 10878;
+
+    var prodInfo = {};
+    Object.keys(pp).forEach(function(code) {
+      var p = pp[code];
+      prodInfo[code] = {
+        name: p.name, cat1: p.cat1, cat2: p.cat2,
+        order_qty: p.order_qty || p.plan_qty || 0,
+        price: p.price, cost: p.cost,
+        has_stock: false, is_new: true
+      };
+    });
+    window.__PLAN__.prod_info = prodInfo;
+
+    console.log('Plan дата татагдлаа:', Object.keys(pp).length, 'бараа');
+
+    if (typeof window.renderPlanTab === 'function') window.renderPlanTab();
+    if (typeof window.refreshDashboard === 'function') window.refreshDashboard();
+    document.dispatchEvent(new CustomEvent('planDataLoaded', { detail: data }));
+  }
+
+  function fetchPlanJSONP() {
+    attempt++;
+    var cbName = '_planCb' + Date.now();
+    var timer = setTimeout(function() {
+      delete window[cbName];
+      var s = document.getElementById('_planScript');
+      if (s) s.parentNode.removeChild(s);
+      if (attempt < MAX_RETRIES) {
+        console.warn('Plan JSONP timeout, retry ' + attempt);
+        setTimeout(fetchPlanJSONP, 2000);
+      } else {
+        console.error('Plan дата татаж чадсангүй (' + MAX_RETRIES + ' оролдлого)');
+      }
+    }, 30000);
+
+    window[cbName] = function(data) {
+      clearTimeout(timer);
+      delete window[cbName];
+      var s = document.getElementById('_planScript');
+      if (s) s.parentNode.removeChild(s);
+      applyPlanData(data);
+    };
+
+    var sc = document.createElement('script');
+    sc.id = '_planScript';
+    sc.src = SCRIPT_URL + '?type=plan&callback=' + cbName + '&t=' + Date.now();
+    document.head.appendChild(sc);
+  }
+
+  // Хуудас бэлэн болсны дараа татах
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', fetchPlanJSONP);
+  } else {
+    fetchPlanJSONP();
+  }
+})();
+</script>
+</body>
+</html>
